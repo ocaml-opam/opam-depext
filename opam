@@ -1,0 +1,10 @@
+opam-version: "1.2"
+name: "installext"
+version: "0.1"
+maintainer: "Louis Gesbert <louis.gesbert@ocamlpro.com>"
+authors: "Louis Gesbert <louis.gesbert@ocamlpro.com>"
+homepage: "https://github.com/AltGr/opam-installext"
+bug-reports: "https://github.com/AltGr/opam-installext/issues"
+license: "LGPL-3.0 with OCaml linking exception"
+dev-repo: "https://github.com/AltGr/opam-installext.git"
+build: [make]
