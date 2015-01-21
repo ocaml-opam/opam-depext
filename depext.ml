@@ -1,5 +1,7 @@
 (* misc functions *)
 
+let debug = ref false
+
 let lines_of_channel ic =
   let rec aux acc =
     match input_line ic with
@@ -9,7 +11,14 @@ let lines_of_channel ic =
   List.rev (aux [])
 
 let lines_of_command c =
+  if !debug then Printf.eprintf "+ %s\n%!" c;
   let ic = Unix.open_process_in c in
+  let lines = lines_of_channel ic in
+  close_in ic;
+  lines
+
+let lines_of_file f =
+  let ic = open_in f in
   let lines = lines_of_channel ic in
   close_in ic;
   lines
@@ -34,9 +43,14 @@ let has_command c =
   let cmd = Printf.sprintf "/bin/sh -c command -v %s" c in
   try Sys.command cmd = 0 with Sys_error _ -> false
 
+let run_command c =
+  let c = String.concat " " (List.map (Printf.sprintf "%S") c) in
+  if !debug then Printf.eprintf "+ %s\n%!" c;
+  Unix.system c
+
 (* system detection *)
 
-let arch =
+let arch () =
   match command_output "uname -m" with
   | "x86_64" -> `X86_64
   | "x86" | "i386" | "i586" | "i686" -> `X86
@@ -44,7 +58,7 @@ let arch =
   | "PPC" | "PowerPC" -> `PPC
   | s -> `Other s
 
-let os = match Sys.os_type with
+let os () = match Sys.os_type with
   | "Unix" ->
     (match command_output "uname -s" with
      | "Darwin"    -> `Darwin
@@ -58,30 +72,43 @@ let os = match Sys.os_type with
   | "Cygwin" -> `Cygwin
   | s        -> `Other s
 
-let distribution = match os with
-  | `Darwin -> Some `Homebrew (* Check first, macports ? *)
+let distribution = function
+  | `Darwin ->
+    if has_command "brew" then Some `Homebrew
+    else if has_command "port" then Some `Macports
+    else None
   | `Linux ->
-    (match command_output "lsb_release -i -s" with
-     | "Debian" -> Some `Debian
-     | "Ubuntu" -> Some `Ubuntu
-     | "Centos" -> Some `Centos
-     | "Fedora" -> Some `Fedora
-     | "Mageia" -> Some `Mageia
-     | s -> Some (`Other s))
+    (try
+       let name =
+         if has_command "lsb_release" then
+           command_output "lsb_release -i -s"
+         else
+         let release_file =
+           List.find Sys.file_exists
+             ["/etc/redhat-release"; "/etc/centos-release"; "/etc/issue"]
+         in
+         List.hd (string_split ' ' (List.hd (lines_of_file release_file)))
+       in
+       match name with
+       | "Debian" -> Some `Debian
+       | "Ubuntu" -> Some `Ubuntu
+       | "Centos" -> Some `Centos
+       | "Fedora" -> Some `Fedora
+       | "Mageia" -> Some `Mageia
+       | s -> Some (`Other s)
+     with Not_found | Failure _ -> None)
   | _ -> None
 
-(* OPAM depexts flags *)
+(* generate OPAM depexts flags *)
 
-let archflags =
-  match arch with
+let archflags = function
   | `X86_64 -> ["x86_64"]
   | `X86 -> ["x86"]
   | `Arm7 -> ["arm";"armv7"]
   | `PPC -> ["ppc"]
   | `Other s -> [String.lowercase s]
 
-let osflags =
-  match os with
+let osflags = function
   | `Darwin -> ["osx"]
   | `Linux -> ["linux"]
   | `Unix -> ["unix"]
@@ -93,8 +120,7 @@ let osflags =
   | `Cygwin -> ["mswindows";"cygwin"]
   | `Other s -> [String.lowercase s]
 
-let distrflags =
-  match distribution with
+let distrflags = function
   | Some `Homebrew -> ["homebrew"]
   | Some `Macports -> ["macports"]
   | Some `Debian -> ["debian"]
@@ -127,55 +153,47 @@ let depexts flags opam_packages =
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
   List.flatten (List.map (string_split ' ') lines)
 
-let install_packages_command packages =
+let install_packages_command distribution packages =
   match distribution with
+  | Some `Homebrew ->
+    "brew"::"install"::packages
+  | Some `Macports ->
+    "port"::"install"::packages
   | Some (`Debian | `Ubuntu) ->
     "apt-get"::"install"::"-qq"::"-yy"::packages
   | Some (`Centos | `Fedora | `Mageia) ->
     "yum"::"install"::"-y"::packages
-  | Some `Homebrew ->
-    "brew"::"install"::packages (* needs check *)
-  | _ -> failwith "Sorry, don't know how to install packages on your system"
+  | Some `FreeBSD ->
+    "pkg"::"install"::packages
+  | Some (`OpenBSD | `NetBSD) ->
+    "pkg_add"::packages
+  | _ ->
+    failwith "Sorry, don't know how to install packages on your system"
 
-let () =
-  let opam_packages = List.tl (Array.to_list Sys.argv) in
-  let flags = archflags @ osflags @ distrflags in
-  if Array.length Sys.argv < 2 then (
-    Printf.printf "# depexts flags detected on this system:\n%s\n%!"
-      (String.concat "\n" flags);
-    exit 0
-  );
-  Printf.printf "Detecting depexts using flags: %s\n%!"
-    (String.concat " " flags);
-  let os_packages = depexts flags opam_packages in
-  let source_urls =
-    List.filter (fun s -> not (List.mem s os_packages))
-      (depexts (sourceflags @ flags) opam_packages)
-  in
-  if os_packages <> [] then
-    Printf.printf "The following system packages are needed:\n  - %s\n%!"
-      (String.concat "\n  - " os_packages);
-  if source_urls <> [] then
-    Printf.printf "The following scripts need to be run:\n  - %s\n%!"
-      (String.concat "\n  - " source_urls);
-  if os_packages = [] && source_urls = [] then
-    Printf.printf "No extra OS packages requirements found.\n%!";
-  if os_packages <> [] then (
-    let cmd = install_packages_command os_packages in
-    let cmd = match os with
-      | `Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly ->
-        (* not sure about this list. Does OSX do sudo ? *)
-        if Unix.getuid () <> 0 then (
-          Printf.printf "System installation will be done through \"sudo\"\n%!";
-          "sudo"::cmd
-        )else cmd
-      | _ -> cmd
-    in
-    match Unix.system (String.concat " " cmd) with
-    | Unix.WEXITED 0 -> Printf.printf "OS packages installation done\n%!"
+let sudo os distribution cmd = match os, distribution with
+  | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
+  | `Darwin, Some `Macports ->
+    (* not sure about this list *)
+    if Unix.getuid () <> 0 then (
+      Printf.printf "Not running as root, \
+                     system installation will be done through \"sudo\"\n%!";
+      "sudo"::cmd
+    ) else cmd
+  | _ -> cmd
+
+let install os distribution = function
+  | [] -> ()
+  | os_packages ->
+    let cmd = install_packages_command distribution os_packages in
+    let cmd = sudo os distribution cmd in
+    match run_command cmd with
+    | Unix.WEXITED 0 ->
+      Printf.printf "# OS packages installation successful\n%!"
     | _ -> failwith "OS package installation failed"
-  );
-  if source_urls <> [] then (
+
+let run_source_scripts = function
+  | [] -> ()
+  | source_urls ->
     let commands =
       (* OPAM supports (and requires) either, by doing it too we ensure that we
          don't need extra depexts *)
@@ -186,9 +204,102 @@ let () =
         List.map (Printf.sprintf "wget -O - \"%s\" | bash -ex -") source_urls
     in
     List.iter (fun cmd ->
-        match Unix.system cmd with
+        match run_command [cmd] with
         | Unix.WEXITED 0 -> ()
         | _ -> failwith (Printf.sprintf "Command %S failed" cmd))
       commands;
     Printf.printf "Source installation scripts run successfully\n%!"
-  )
+
+
+(* Command-line handling *)
+
+let main print_flags list short no_sources debug_arg opam_packages =
+  if debug_arg then debug := true;
+  let arch = arch () in
+  let os = os () in
+  let distribution = distribution os in
+  let flags = archflags arch @ osflags os @ distrflags distribution in
+  if print_flags then
+    (if short then List.iter print_endline flags else
+       Printf.printf "# Depexts flags detected on this system: %s\n"
+         (String.concat " " flags);
+     exit 0);
+  if not short then
+    Printf.printf "# Detecting depexts using flags: %s\n%!"
+      (String.concat " " flags);
+  let os_packages = depexts flags opam_packages in
+  if short then List.iter print_endline os_packages
+  else if os_packages <> [] then
+    Printf.printf "# The following system packages are needed:\n#  - %s\n%!"
+      (String.concat "\n#  - " os_packages)
+  else if list then print_endline "# No required system packages found";
+  if list then exit 0;
+  let source_urls =
+    if no_sources then [] else
+      List.filter (fun s -> not (List.mem s os_packages))
+        (depexts (sourceflags @ flags) opam_packages)
+  in
+  if source_urls <> [] && not short then
+    Printf.printf "# The following scripts need to be run:\n#  - %s\n%!"
+      (String.concat "\n#  - " source_urls);
+  if os_packages = [] && source_urls = [] then
+    (Printf.printf "# No extra OS packages requirements found.\n%!";
+     exit 0);
+  install os distribution os_packages;
+  run_source_scripts source_urls
+
+open Cmdliner
+
+let packages_arg =
+  Arg.(value & pos_all string [] &
+       info ~docv:"PACKAGES"
+         ~doc:"OPAM packages to install external dependencies for. \
+               All installed packages if omitted" [])
+
+let print_flags_arg =
+  Arg.(value & flag &
+       info ~doc:"Only display the inferred \"depexts\" flags" ["flags"])
+
+let list_arg =
+  Arg.(value & flag &
+       info ~doc:"Only list the system packages needed" ["l";"list"])
+
+let short_arg =
+  Arg.(value & flag &
+       info ~doc:"Only output the raw item lists" ["s";"short"])
+
+let no_sources_arg =
+  Arg.(value & flag &
+       info ~doc:"Don't handle remote source scripts" ["no-sources"])
+
+let debug_arg =
+  Arg.(value & flag &
+       info ~doc:"Print commands that are run by the program" ["d";"debug"])
+
+let command =
+  let man = [
+    `S "DESCRIPTION";
+    `P "opam-depext is a simple program intended to facilitate the interaction \
+        between OPAM packages and the host package management system. It can \
+        perform OS and distribution detection, query OPAM for the right \
+        external dependencies on a set of packages, and call the OS's package \
+        manager in the appropriate way to install then.";
+    `S "COPYRIGHT";
+    `P "opam-depext is written by Louis Gesbert <louis.gesbert@ocamlpro.com>, \
+        copyright OCamlPro 2014-2015, \
+        distributed under the terms of the LGPL v3 with linking exception. \
+        Full source available at $(i,https://github.com/AltGr/opam-depext)";
+    `S "BUGS";
+    `P "Bugs are tracked at $(i,https://github.com/AltGr/opam-depext/issues).";
+  ] in
+  let doc = "Query and install external dependencies of OPAM packages" in
+  Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
+        no_sources_arg $ debug_arg $
+        packages_arg),
+  Term.info "opam-depext" ~version:"0.2" ~doc ~man
+
+let () =
+  match Term.eval command with
+  | `Ok () | `Version | `Help -> exit 0
+  | `Error (`Parse | `Term) -> exit 2
+  | `Error `Exn -> exit 1
