@@ -1,4 +1,4 @@
-OPAM installext plugin
+OPAM depext plugin
 
 Replacement for the currently used shell-scripts handling distribution-specific
 installation of OPAM packages' external dependencies (as per the `depexts` field
