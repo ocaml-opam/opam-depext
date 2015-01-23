@@ -1,3 +1,5 @@
+PREFIX=$(shell opam config var prefix)
+
 all: opam-depext
 
 ALWAYS:
@@ -10,3 +12,6 @@ _build/%: ALWAYS
 
 clean:
 	rm -rf _build opam-depext
+
+install:
+	opam-installer --prefix=$(PREFIX)

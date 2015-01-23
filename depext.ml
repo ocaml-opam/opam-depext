@@ -213,7 +213,7 @@ let run_source_scripts = function
 
 (* Command-line handling *)
 
-let main print_flags list short no_sources debug_arg opam_packages =
+let main print_flags list short no_sources debug_arg install_arg opam_packages =
   if debug_arg then debug := true;
   let arch = arch () in
   let os = os () in
@@ -243,10 +243,12 @@ let main print_flags list short no_sources debug_arg opam_packages =
     Printf.printf "# The following scripts need to be run:\n#  - %s\n%!"
       (String.concat "\n#  - " source_urls);
   if os_packages = [] && source_urls = [] then
-    (Printf.printf "# No extra OS packages requirements found.\n%!";
-     exit 0);
+    Printf.printf "# No extra OS packages requirements found.\n%!";
   install os distribution os_packages;
-  run_source_scripts source_urls
+  run_source_scripts source_urls;
+  if install_arg && opam_packages <> [] then
+    (Printf.printf "# Now letting OPAM install the packages";
+     Unix.execvp "opam" (Array.of_list ("opam"::"install"::opam_packages)))
 
 open Cmdliner
 
@@ -276,6 +278,11 @@ let debug_arg =
   Arg.(value & flag &
        info ~doc:"Print commands that are run by the program" ["d";"debug"])
 
+let install_arg =
+  Arg.(value & flag &
+       info ~doc:"Install the packages through \"opam install\" after \
+                  installing external dependencies" ["i";"install"])
+
 let command =
   let man = [
     `S "DESCRIPTION";
@@ -294,7 +301,7 @@ let command =
   ] in
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
-        no_sources_arg $ debug_arg $
+        no_sources_arg $ debug_arg $ install_arg $
         packages_arg),
   Term.info "opam-depext" ~version:"0.2" ~doc ~man
 
