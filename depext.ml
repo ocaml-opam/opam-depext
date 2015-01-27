@@ -4,9 +4,10 @@ let debug = ref false
 
 let lines_of_channel ic =
   let rec aux acc =
-    match input_line ic with
-    | s -> aux (s::acc)
-    | exception End_of_file -> acc
+    let line = try Some (input_line ic) with End_of_file -> None in
+    match line with
+    | Some s -> aux (s::acc)
+    | None -> acc
   in
   List.rev (aux [])
 
