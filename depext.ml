@@ -45,7 +45,7 @@ let has_command c =
   try Sys.command cmd = 0 with Sys_error _ -> false
 
 let run_command c =
-  let c = String.concat " " (List.map (Printf.sprintf "%S") c) in
+  let c = String.concat " " (List.map (Printf.sprintf "%s") c) in
   if !debug then Printf.eprintf "+ %s\n%!" c;
   Unix.system c
 
