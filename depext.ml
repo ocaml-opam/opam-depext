@@ -90,12 +90,12 @@ let distribution = function
          in
          List.hd (string_split ' ' (List.hd (lines_of_file release_file)))
        in
-       match name with
-       | "Debian" -> Some `Debian
-       | "Ubuntu" -> Some `Ubuntu
-       | "Centos" -> Some `Centos
-       | "Fedora" -> Some `Fedora
-       | "Mageia" -> Some `Mageia
+       match String.lowercase name with
+       | "debian" -> Some `Debian
+       | "ubuntu" -> Some `Ubuntu
+       | "centos" -> Some `Centos
+       | "fedora" -> Some `Fedora
+       | "mageia" -> Some `Mageia
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
   | _ -> None
@@ -168,7 +168,9 @@ let install_packages_command distribution packages =
     "pkg"::"install"::packages
   | Some (`OpenBSD | `NetBSD) ->
     "pkg_add"::packages
-  | _ ->
+  | Some (`Other d) ->
+    failwith ("Sorry, don't know how to install packages on your " ^ d ^ " system")
+  | None ->
     failwith "Sorry, don't know how to install packages on your system"
 
 let sudo os distribution cmd = match os, distribution with
