@@ -41,7 +41,7 @@ let string_split char str =
   aux 0
 
 let has_command c =
-  let cmd = Printf.sprintf "/bin/sh -c command -v %s" c in
+  let cmd = Printf.sprintf "command -v %s" c in
   try Sys.command cmd = 0 with Sys_error _ -> false
 
 let run_command c =
