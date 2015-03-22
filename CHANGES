@@ -1,0 +1,17 @@
+0.4 (2015-03-22):
+* Add `-u` or `--update` flag to trigger an OS package set update
+  before performing external dependency installation. This is useful
+  on Debian or Ubuntu where package installation may fail if the
+  sets are not up-to-date with respect to latest security updates.
+* Fix installation of source packages.
+* Detect the CentOS distribution correctly.
+* Fix external command detection to not go through a subshell.
+
+0.3 (2015-01-27):
+* Add OCaml 3.12.1 compatibility.
+* Add `-i` flag to perform OPAM package installation after the
+  external OS dependencies are installed.
+* Fixes for MacPorts and CentOS support.
+
+0.2 (2015-01-21):
+* Initial public release.
