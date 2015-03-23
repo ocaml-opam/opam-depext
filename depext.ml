@@ -41,11 +41,11 @@ let string_split char str =
   aux 0
 
 let has_command c =
-  let cmd = Printf.sprintf "/bin/sh -c command -v %s" c in
+  let cmd = Printf.sprintf "command -v %s" c in
   try Sys.command cmd = 0 with Sys_error _ -> false
 
 let run_command c =
-  let c = String.concat " " (List.map (Printf.sprintf "%S") c) in
+  let c = String.concat " " (List.map (Printf.sprintf "%s") c) in
   if !debug then Printf.eprintf "+ %s\n%!" c;
   Unix.system c
 
@@ -90,12 +90,12 @@ let distribution = function
          in
          List.hd (string_split ' ' (List.hd (lines_of_file release_file)))
        in
-       match name with
-       | "Debian" -> Some `Debian
-       | "Ubuntu" -> Some `Ubuntu
-       | "Centos" -> Some `Centos
-       | "Fedora" -> Some `Fedora
-       | "Mageia" -> Some `Mageia
+       match String.lowercase name with
+       | "debian" -> Some `Debian
+       | "ubuntu" -> Some `Ubuntu
+       | "centos" -> Some `Centos
+       | "fedora" -> Some `Fedora
+       | "mageia" -> Some `Mageia
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
   | _ -> None
@@ -168,7 +168,9 @@ let install_packages_command distribution packages =
     "pkg"::"install"::packages
   | Some (`OpenBSD | `NetBSD) ->
     "pkg_add"::packages
-  | _ ->
+  | Some (`Other d) ->
+    failwith ("Sorry, don't know how to install packages on your " ^ d ^ " system")
+  | None ->
     failwith "Sorry, don't know how to install packages on your system"
 
 let sudo os distribution cmd = match os, distribution with
@@ -181,6 +183,23 @@ let sudo os distribution cmd = match os, distribution with
       "sudo"::cmd
     ) else cmd
   | _ -> cmd
+
+let update_command = function
+  | Some (`Debian | `Ubuntu) ->
+     ["apt-get";"update"]
+  | Some (`Homebrew) ->
+     ["brew"; "update"]
+  | Some (`Centos | `Fedora | `Mageia) ->
+     ["yum"; "update"]
+  | _ -> ["echo"; "Skipping system update on this platform."]
+
+let update os distribution =
+  let cmd = update_command distribution in
+  let cmd = sudo os distribution cmd in
+  match run_command cmd with
+  | Unix.WEXITED 0 ->
+    Printf.printf "# OS package update successful\n%!"
+  | _ -> failwith "OS package update failed"
 
 let install os distribution = function
   | [] -> ()
@@ -214,7 +233,7 @@ let run_source_scripts = function
 
 (* Command-line handling *)
 
-let main print_flags list short no_sources debug_arg install_arg opam_packages =
+let main print_flags list short no_sources debug_arg install_arg update_arg opam_packages =
   if debug_arg then debug := true;
   let arch = arch () in
   let os = os () in
@@ -244,7 +263,8 @@ let main print_flags list short no_sources debug_arg install_arg opam_packages =
     Printf.printf "# The following scripts need to be run:\n#  - %s\n%!"
       (String.concat "\n#  - " source_urls);
   if os_packages = [] && source_urls = [] then
-    Printf.printf "# No extra OS packages requirements found.\n%!";
+    Printf.printf "# No extra OS packages requirements found.\n%!"
+  else (if update_arg then update os distribution);
   install os distribution os_packages;
   run_source_scripts source_urls;
   if install_arg && opam_packages <> [] then
@@ -279,6 +299,10 @@ let debug_arg =
   Arg.(value & flag &
        info ~doc:"Print commands that are run by the program" ["d";"debug"])
 
+let update_arg =
+  Arg.(value & flag &
+       info ~doc:"Update the OS package sets before installation" ["u";"update"])
+
 let install_arg =
   Arg.(value & flag &
        info ~doc:"Install the packages through \"opam install\" after \
@@ -302,9 +326,9 @@ let command =
   ] in
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
-        no_sources_arg $ debug_arg $ install_arg $
+        no_sources_arg $ debug_arg $ install_arg $ update_arg $
         packages_arg),
-  Term.info "opam-depext" ~version:"0.3" ~doc ~man
+  Term.info "opam-depext" ~version:"0.4" ~doc ~man
 
 let () =
   match Term.eval command with
