@@ -86,16 +86,19 @@ let distribution = function
          else
          let release_file =
            List.find Sys.file_exists
-             ["/etc/redhat-release"; "/etc/centos-release"; "/etc/issue"]
+             ["/etc/redhat-release"; "/etc/centos-release";
+              "/etc/gentoo-release"; "/etc/issue"; "/etc/os-release"]
          in
          List.hd (string_split ' ' (List.hd (lines_of_file release_file)))
        in
        match String.lowercase name with
-       | "debian" -> Some `Debian
-       | "ubuntu" -> Some `Ubuntu
-       | "centos" -> Some `Centos
-       | "fedora" -> Some `Fedora
-       | "mageia" -> Some `Mageia
+       | "debian"    -> Some `Debian
+       | "ubuntu"    -> Some `Ubuntu
+       | "centos"    -> Some `Centos
+       | "fedora"    -> Some `Fedora
+       | "mageia"    -> Some `Mageia
+       | "gentoo"    -> Some `Gentoo
+       | "archlinux" -> Some `Archlinux
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
   | _ -> None
@@ -122,13 +125,15 @@ let osflags = function
   | `Other s -> [String.lowercase s]
 
 let distrflags = function
-  | Some `Homebrew -> ["homebrew"]
-  | Some `Macports -> ["macports"]
-  | Some `Debian -> ["debian"]
-  | Some `Ubuntu -> ["ubuntu"]
-  | Some `Centos -> ["centos"]
-  | Some `Fedora -> ["fedora"]
-  | Some `Mageia -> ["mageia"]
+  | Some `Homebrew  -> ["homebrew"]
+  | Some `Macports  -> ["macports"]
+  | Some `Debian    -> ["debian"]
+  | Some `Ubuntu    -> ["ubuntu"]
+  | Some `Centos    -> ["centos"]
+  | Some `Fedora    -> ["fedora"]
+  | Some `Mageia    -> ["mageia"]
+  | Some `Archlinux -> ["archlinux"]
+  | Some `Gentoo    -> ["gentoo"]
   | Some (`Other s) -> [String.lowercase s]
   | None -> []
 
@@ -168,6 +173,10 @@ let install_packages_command distribution packages =
     "pkg"::"install"::packages
   | Some (`OpenBSD | `NetBSD) ->
     "pkg_add"::packages
+  | Some `Archlinux ->
+    "pacman"::"-S"::packages
+  | Some `Gentoo ->
+    "emerge"::packages
   | Some (`Other d) ->
     failwith ("Sorry, don't know how to install packages on your " ^ d ^ " system")
   | None ->
@@ -187,10 +196,14 @@ let sudo os distribution cmd = match os, distribution with
 let update_command = function
   | Some (`Debian | `Ubuntu) ->
      ["apt-get";"update"]
-  | Some (`Homebrew) ->
+  | Some `Homebrew ->
      ["brew"; "update"]
   | Some (`Centos | `Fedora | `Mageia) ->
      ["yum"; "update"]
+  | Some `Archlinux ->
+     ["pacman"; "-S"]
+  | Some `Gentoo ->
+     ["emerge"; "-u"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
 let update os distribution =
