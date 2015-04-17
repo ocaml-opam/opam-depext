@@ -189,7 +189,9 @@ let sudo os distribution cmd = match os, distribution with
     (* not sure about this list *)
     if Unix.getuid () <> 0 then (
       Printf.printf "Not running as root, \
-                     system installation will be done through \"sudo\"\n%!";
+                     the following command will be run through \"sudo\":\n\
+                    \    %s\n%!"
+        (String.concat " " cmd);
       "sudo"::cmd
     ) else cmd
   | _ -> cmd
