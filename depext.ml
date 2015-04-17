@@ -159,24 +159,25 @@ let depexts flags opam_packages =
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
   List.flatten (List.map (string_split ' ') lines)
 
-let install_packages_command distribution packages =
+let install_packages_commands distribution packages =
   match distribution with
   | Some `Homebrew ->
-    "brew"::"install"::packages
+    ["brew"::"install"::packages]
   | Some `Macports ->
-    "port"::"install"::packages
+    ["port"::"install"::packages]
   | Some (`Debian | `Ubuntu) ->
-    "apt-get"::"install"::"-qq"::"-yy"::packages
+    ["apt-get"::"install"::"-qq"::"-yy"::packages]
   | Some (`Centos | `Fedora | `Mageia) ->
-    "yum"::"install"::"-y"::packages
+    ["yum"::"install"::"-y"::packages;
+     "rpm"::"-q"::packages]
   | Some `FreeBSD ->
-    "pkg"::"install"::packages
+    ["pkg"::"install"::packages]
   | Some (`OpenBSD | `NetBSD) ->
-    "pkg_add"::packages
+    ["pkg_add"::packages]
   | Some `Archlinux ->
-    "pacman"::"-S"::packages
+    ["pacman"::"-S"::packages]
   | Some `Gentoo ->
-    "emerge"::packages
+    ["emerge"::packages]
   | Some (`Other d) ->
     failwith ("Sorry, don't know how to install packages on your " ^ d ^ " system")
   | None ->
@@ -217,12 +218,16 @@ let update os distribution =
 let install os distribution = function
   | [] -> ()
   | os_packages ->
-    let cmd = install_packages_command distribution os_packages in
-    let cmd = sudo os distribution cmd in
-    match run_command cmd with
-    | Unix.WEXITED 0 ->
-      Printf.printf "# OS packages installation successful\n%!"
-    | _ -> failwith "OS package installation failed"
+    let cmds = install_packages_commands distribution os_packages in
+    let cmds = List.map (sudo os distribution) cmds in
+    let is_success r = (r = Unix.WEXITED 0) in
+    let ok =
+      List.fold_left (fun ok cmd ->
+          if ok then is_success (run_command cmd) else false)
+        true cmds
+    in
+    if ok then Printf.printf "# OS packages installation successful\n%!"
+    else failwith "OS package installation failed"
 
 let run_source_scripts = function
   | [] -> ()
