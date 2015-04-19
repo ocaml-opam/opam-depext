@@ -331,24 +331,25 @@ let install_arg =
 let command =
   let man = [
     `S "DESCRIPTION";
-    `P "opam-depext is a simple program intended to facilitate the interaction \
+    `P "$(b,opam-depext) is a simple program intended to facilitate the interaction \
         between OPAM packages and the host package management system. It can \
         perform OS and distribution detection, query OPAM for the right \
-        external dependencies on a set of packages, and call the OS's package \
+        external dependencies on a set of packages, and call the OS package \
         manager in the appropriate way to install then.";
     `S "COPYRIGHT";
-    `P "opam-depext is written by Louis Gesbert <louis.gesbert@ocamlpro.com>, \
-        copyright OCamlPro 2014-2015, \
+    `P "$(b,opam-depext) is written by Louis Gesbert <louis.gesbert@ocamlpro.com>, \
+        copyright OCamlPro 2014-2015 with contributions from Anil Madhavapeddy, \
         distributed under the terms of the LGPL v3 with linking exception. \
-        Full source available at $(i,https://github.com/AltGr/opam-depext)";
+        Full source available at $(i,https://github.com/ocaml/opam-depext)";
     `S "BUGS";
-    `P "Bugs are tracked at $(i,https://github.com/AltGr/opam-depext/issues).";
+    `P "Bugs are tracked at $(i,https://github.com/ocaml/opam-depext/issues) \
+        or can be reported to $(i,<opam-devel@lists.ocaml.org>).";
   ] in
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $
         packages_arg),
-  Term.info "opam-depext" ~version:"0.4" ~doc ~man
+  Term.info "opam-depext" ~version:"0.5" ~doc ~man
 
 let () =
   match Term.eval command with
