@@ -202,7 +202,7 @@ let update_command = function
   | Some `Homebrew ->
      ["brew"; "update"]
   | Some (`Centos | `Fedora | `Mageia) ->
-     ["yum"; "update"]
+     ["yum"; "-y"; "update"]
   | Some `Archlinux ->
      ["pacman"; "-S"]
   | Some `Gentoo ->
