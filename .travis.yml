@@ -1,6 +1,7 @@
 language: c
 install: wget https://raw.githubusercontent.com/ocaml/ocaml-travisci-skeleton/master/.travis-opam.sh
 script: bash -ex .travis-opam.sh
+sudo: required
 env:
   - PACKAGE="opam-depext" OCAML_VERSION=latest POST_INSTALL_HOOK="opam depext async_ssl"
   - PACKAGE="opam-depext" OCAML_VERSION=4.01   POST_INSTALL_HOOK="opam depext mirage"
