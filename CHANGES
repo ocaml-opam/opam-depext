@@ -1,3 +1,10 @@
+0.5 (2015-04-19):
+* Do not let `yum upgrade` go interactive.
+* Print commands before `sudo` so that they can be cut-and-pasted (#4).
+* Double-check the installation of multiple RPMs as the exit code
+  can be unreliable (#9).
+* Add support for Gentoo and Arch Linux (#11).
+
 0.4 (2015-03-22):
 * Add `-u` or `--update` flag to trigger an OS package set update
   before performing external dependency installation. This is useful
