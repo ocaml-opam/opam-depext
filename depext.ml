@@ -183,19 +183,6 @@ let install_packages_commands distribution packages =
   | None ->
     failwith "Sorry, don't know how to install packages on your system"
 
-let sudo os distribution cmd = match os, distribution with
-  | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
-  | `Darwin, Some `Macports ->
-    (* not sure about this list *)
-    if Unix.getuid () <> 0 then (
-      Printf.printf "Not running as root, \
-                     the following command will be run through \"sudo\":\n\
-                    \    %s\n%!"
-        (String.concat " " cmd);
-      "sudo"::cmd
-    ) else cmd
-  | _ -> cmd
-
 let update_command = function
   | Some (`Debian | `Ubuntu) ->
      ["apt-get";"update"]
@@ -208,6 +195,46 @@ let update_command = function
   | Some `Gentoo ->
      ["emerge"; "-u"]
   | _ -> ["echo"; "Skipping system update on this platform."]
+
+let get_installed_packages distribution packages =
+  match distribution with
+  | Some `Homebrew ->
+    let lines = try lines_of_command "brew list" with _ -> [] in
+    let installed = List.flatten (List.map (string_split ' ') lines) in
+    List.filter (fun p -> List.mem p packages) installed
+  | Some (`Debian | `Ubuntu) ->
+    let cmd =
+      String.concat " "
+        ("dpkg-query -W -f '${Package} ${Status}\\n'" :: packages
+         @ ["2>/dev/null"])
+    in
+    let lines = try lines_of_command cmd with _ -> [] in
+    List.fold_left
+      (fun acc l -> match string_split ' ' l with
+         | [pkg;_;_;"installed"] -> pkg :: acc
+         | _ -> acc)
+      [] lines
+  (* todo *)
+  | Some `Macports -> []
+  | Some (`Centos | `Fedora | `Mageia) -> []
+  | Some `FreeBSD -> []
+  | Some (`OpenBsd | `NetBSD) -> []
+  | Some `Archlinux -> []
+  | Some `Gentoo -> []
+  | Some (`Other _) | None -> []
+
+let sudo os distribution cmd = match os, distribution with
+  | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
+  | `Darwin, Some `Macports ->
+    (* not sure about this list *)
+    if Unix.getuid () <> 0 then (
+      Printf.printf "Not running as root, \
+                     the following command will be run through \"sudo\":\n\
+                    \    %s\n%!"
+        (String.concat " " cmd);
+      "sudo"::cmd
+    ) else cmd
+  | _ -> cmd
 
 let update os distribution =
   let cmd = update_command distribution in
@@ -283,8 +310,20 @@ let main print_flags list short no_sources debug_arg install_arg update_arg opam
     Printf.printf "# The following scripts need to be run:\n#  - %s\n%!"
       (String.concat "\n#  - " source_urls);
   if os_packages = [] && source_urls = [] then
-    Printf.printf "# No extra OS packages requirements found.\n%!"
-  else (if update_arg then update os distribution);
+    Printf.printf "# No extra OS packages requirements found.\n%!";
+  let installed = get_installed_packages distribution os_packages in
+  let os_packages =
+    List.filter (fun p -> not (List.mem p installed)) os_packages
+  in
+  if installed <> [] then
+    if os_packages <> [] then
+      Printf.printf
+        "# The following new OS packages need to be installed: %s\n%!"
+        (String.concat " " os_packages)
+    else
+      Printf.printf
+        "# All required OS packages found.\n%!";
+  if os_packages <> [] && update_arg then update os distribution;
   install os distribution os_packages;
   run_source_scripts source_urls;
   if install_arg && opam_packages <> [] then
