@@ -280,7 +280,9 @@ let run_source_scripts = function
 
 (* Command-line handling *)
 
-let main print_flags list short no_sources debug_arg install_arg update_arg opam_packages =
+let main print_flags list short no_sources
+    debug_arg install_arg update_arg dryrun_arg
+    opam_packages =
   if debug_arg then debug := true;
   let arch = arch () in
   let os = os () in
@@ -295,11 +297,11 @@ let main print_flags list short no_sources debug_arg install_arg update_arg opam
     Printf.printf "# Detecting depexts using flags: %s\n%!"
       (String.concat " " flags);
   let os_packages = depexts flags opam_packages in
-  if short then List.iter print_endline os_packages
-  else if os_packages <> [] then
+  if os_packages <> [] && not short then
     Printf.printf "# The following system packages are needed:\n#  - %s\n%!"
       (String.concat "\n#  - " os_packages)
-  else if list then print_endline "# No required system packages found";
+  else if list && not short then
+    print_endline "# No required system packages found";
   if list then exit 0;
   let source_urls =
     if no_sources then [] else
@@ -309,13 +311,16 @@ let main print_flags list short no_sources debug_arg install_arg update_arg opam
   if source_urls <> [] && not short then
     Printf.printf "# The following scripts need to be run:\n#  - %s\n%!"
       (String.concat "\n#  - " source_urls);
-  if os_packages = [] && source_urls = [] then
+  if os_packages = [] && source_urls = [] && not short then
     Printf.printf "# No extra OS packages requirements found.\n%!";
   let installed = get_installed_packages distribution os_packages in
   let os_packages =
     List.filter (fun p -> not (List.mem p installed)) os_packages
   in
-  if installed <> [] then
+  if short then
+    (List.iter print_endline os_packages;
+     List.iter print_endline source_urls)
+  else if installed <> [] then
     if os_packages <> [] then
       Printf.printf
         "# The following new OS packages need to be installed: %s\n%!"
@@ -323,6 +328,7 @@ let main print_flags list short no_sources debug_arg install_arg update_arg opam
     else
       Printf.printf
         "# All required OS packages found.\n%!";
+  if dryrun_arg then exit (if os_packages = [] then 0 else 1);
   if os_packages <> [] && update_arg then update os distribution;
   install os distribution os_packages;
   run_source_scripts source_urls;
@@ -367,6 +373,14 @@ let install_arg =
        info ~doc:"Install the packages through \"opam install\" after \
                   installing external dependencies" ["i";"install"])
 
+let dryrun_arg =
+  Arg.(value & flag &
+       info ~doc:"Only list the new system packages (and source scripts) that \
+                  would need to be installed, don't try to install them. Exits \
+                  with 0 if all required system packages are already installed, \
+                  1 otherwise."
+         ["n";"dry-run"])
+
 let command =
   let man = [
     `S "DESCRIPTION";
@@ -386,7 +400,7 @@ let command =
   ] in
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
-        no_sources_arg $ debug_arg $ install_arg $ update_arg $
+        no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
         packages_arg),
   Term.info "opam-depext" ~version:"0.5" ~doc ~man
 
