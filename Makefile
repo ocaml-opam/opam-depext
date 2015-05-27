@@ -11,7 +11,7 @@ _build/%: ALWAYS
 	ocamlbuild -tags debug,use_unix -pkg cmdliner $*
 
 clean:
-	rm -rf _build opam-depext
+	rm -rf _build opam-depext depext.native
 
 install:
 	opam-installer --prefix=$(PREFIX)
