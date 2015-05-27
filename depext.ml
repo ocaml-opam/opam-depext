@@ -217,8 +217,6 @@ let get_installed_packages distribution (packages: string list): string list =
          | [pkg;_;_;"installed"] -> pkg :: acc
          | _ -> acc)
       [] lines
-  (* todo *)
-  | Some `Macports -> []
   | Some (`Centos | `Fedora | `Mageia) ->
     List.filter (fun pkg_name ->
         let cmd = "rpm -qi " ^ pkg_name in
@@ -227,6 +225,8 @@ let get_installed_packages distribution (packages: string list): string list =
         | Unix.WEXITED 1 -> false
         | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
       ) packages
+  (* todo *)
+  | Some `Macports -> []
   | Some `FreeBSD -> []
   | Some (`OpenBsd | `NetBSD) -> []
   | Some `Archlinux -> []
