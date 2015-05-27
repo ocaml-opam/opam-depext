@@ -217,10 +217,11 @@ let get_installed_packages distribution (packages: string list): string list =
          | [pkg;_;_;"installed"] -> pkg :: acc
          | _ -> acc)
       [] lines
-  | Some (`Centos | `Fedora | `Mageia | `Archlinux) ->
+  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo) ->
     let query_command_prefix = match distribution with
       | Some (`Centos | `Fedora | `Mageia) -> "rpm -qi "
       | Some `Archlinux -> "pacman -Q "
+      | Some `Gentoo -> "equery list "
       | _ -> assert(false)
     in
     List.filter
@@ -235,7 +236,6 @@ let get_installed_packages distribution (packages: string list): string list =
   | Some `Macports -> []
   | Some `FreeBSD -> []
   | Some (`OpenBsd | `NetBSD) -> []
-  | Some `Gentoo -> []
   | Some (`Other _) | None -> []
 
 let sudo os distribution cmd = match os, distribution with
