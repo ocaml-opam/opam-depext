@@ -196,7 +196,10 @@ let update_command = function
      ["emerge"; "-u"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
-let get_installed_packages distribution packages =
+exception Signaled_or_stopped of string * Unix.process_status
+
+(* filter 'packages' to retain only the installed ones *)
+let get_installed_packages distribution (packages: string list): string list =
   match distribution with
   | Some `Homebrew ->
     let lines = try lines_of_command "brew list" with _ -> [] in
@@ -216,7 +219,14 @@ let get_installed_packages distribution packages =
       [] lines
   (* todo *)
   | Some `Macports -> []
-  | Some (`Centos | `Fedora | `Mageia) -> []
+  | Some (`Centos | `Fedora | `Mageia) ->
+    List.filter (fun pkg_name ->
+        let cmd = "rpm -qi " ^ pkg_name in
+        match Unix.system cmd with
+        | Unix.WEXITED 0 -> true
+        | Unix.WEXITED 1 -> false
+        | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
+      ) packages
   | Some `FreeBSD -> []
   | Some (`OpenBsd | `NetBSD) -> []
   | Some `Archlinux -> []
