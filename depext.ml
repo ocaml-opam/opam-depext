@@ -217,19 +217,24 @@ let get_installed_packages distribution (packages: string list): string list =
          | [pkg;_;_;"installed"] -> pkg :: acc
          | _ -> acc)
       [] lines
-  | Some (`Centos | `Fedora | `Mageia) ->
-    List.filter (fun pkg_name ->
-        let cmd = "rpm -qi " ^ pkg_name in
-        match Unix.system cmd with
-        | Unix.WEXITED 0 -> true
-        | Unix.WEXITED 1 -> false
-        | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
+  | Some (`Centos | `Fedora | `Mageia | `Archlinux) ->
+    let query_command_prefix = match distribution with
+      | Some (`Centos | `Fedora | `Mageia) -> "rpm -qi "
+      | Some `Archlinux -> "pacman -Q "
+      | _ -> assert(false)
+    in
+    List.filter
+      (fun pkg_name ->
+         let cmd = query_command_prefix ^ pkg_name ^ " 2>/dev/null" in
+         match Unix.system cmd with
+         | Unix.WEXITED 0 -> true (* installed *)
+         | Unix.WEXITED 1 -> false (* not installed *)
+         | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
       ) packages
   (* todo *)
   | Some `Macports -> []
   | Some `FreeBSD -> []
   | Some (`OpenBsd | `NetBSD) -> []
-  | Some `Archlinux -> []
   | Some `Gentoo -> []
   | Some (`Other _) | None -> []
 
