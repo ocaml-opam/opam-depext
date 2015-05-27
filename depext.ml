@@ -81,15 +81,20 @@ let distribution = function
   | `Linux ->
     (try
        let name =
-         if has_command "lsb_release" then
+         let os_release_files = ["/etc/os-release"; "/usr/lib/os-release"] in
+         if List.exists Sys.file_exists os_release_files then
+           let file = List.find Sys.file_exists os_release_files in
+           let lines = lines_of_file file in
+           let kv_list = List.fold_left (fun acc l -> match string_split '=' l with
+                                                      | k::v::[] -> (k, v)::acc
+                                                      | _ -> acc) [] lines in
+	   List.assoc "ID" kv_list
+         else if has_command "lsb_release" then
            command_output "lsb_release -i -s"
-         else
-         let release_file =
-           List.find Sys.file_exists
-             ["/etc/redhat-release"; "/etc/centos-release";
-              "/etc/gentoo-release"; "/etc/issue"; "/etc/os-release"]
-         in
-         List.hd (string_split ' ' (List.hd (lines_of_file release_file)))
+         else let release_file = List.find Sys.file_exists
+                                           ["/etc/redhat-release"; "/etc/centos-release";
+                                            "/etc/gentoo-release"; "/etc/issue"]
+              in (List.hd (string_split ' ' (List.hd (lines_of_file release_file))))
        in
        match String.lowercase name with
        | "debian" -> Some `Debian
