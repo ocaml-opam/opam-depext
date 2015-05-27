@@ -98,7 +98,7 @@ let distribution = function
        | "fedora" -> Some `Fedora
        | "mageia" -> Some `Mageia
        | "gentoo" -> Some `Gentoo
-       | "archlinux" -> Some `Archlinux
+       | "arch" -> Some `Archlinux
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
   | _ -> None
