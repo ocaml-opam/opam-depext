@@ -196,7 +196,10 @@ let update_command = function
      ["emerge"; "-u"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
-let get_installed_packages distribution packages =
+exception Signaled_or_stopped of string * Unix.process_status
+
+(* filter 'packages' to retain only the installed ones *)
+let get_installed_packages distribution (packages: string list): string list =
   match distribution with
   | Some `Homebrew ->
     let lines = try lines_of_command "brew list" with _ -> [] in
@@ -214,13 +217,25 @@ let get_installed_packages distribution packages =
          | [pkg;_;_;"installed"] -> pkg :: acc
          | _ -> acc)
       [] lines
+  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo) ->
+    let query_command_prefix = match distribution with
+      | Some (`Centos | `Fedora | `Mageia) -> "rpm -qi "
+      | Some `Archlinux -> "pacman -Q "
+      | Some `Gentoo -> "equery list "
+      | _ -> assert(false)
+    in
+    List.filter
+      (fun pkg_name ->
+         let cmd = query_command_prefix ^ pkg_name ^ " 2>/dev/null" in
+         match Unix.system cmd with
+         | Unix.WEXITED 0 -> true (* installed *)
+         | Unix.WEXITED 1 -> false (* not installed *)
+         | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
+      ) packages
   (* todo *)
   | Some `Macports -> []
-  | Some (`Centos | `Fedora | `Mageia) -> []
   | Some `FreeBSD -> []
   | Some (`OpenBsd | `NetBSD) -> []
-  | Some `Archlinux -> []
-  | Some `Gentoo -> []
   | Some (`Other _) | None -> []
 
 let sudo os distribution cmd = match os, distribution with
