@@ -17,3 +17,4 @@ build: [
     { !ocaml-native }
 ]
 depends: [ "cmdliner" {build} ]
+tags: "flags:plugin"
