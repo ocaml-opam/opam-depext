@@ -208,7 +208,7 @@ let get_installed_packages distribution (packages: string list): string list =
   | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Ubuntu | `Debian) ->
     let query_command_prefix = match distribution with
       | Some (`Centos | `Fedora | `Mageia) -> "rpm -qi "
-      | Some (`Debian | `Ubuntu) -> "dpkg -l"
+      | Some (`Debian | `Ubuntu) -> "dpkg -l "
       | Some `Archlinux -> "pacman -Q "
       | Some `Gentoo -> "equery list "
       | _ -> assert(false)
