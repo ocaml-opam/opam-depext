@@ -215,7 +215,7 @@ let get_installed_packages distribution (packages: string list): string list =
     in
     List.filter
       (fun pkg_name ->
-         let cmd = query_command_prefix ^ pkg_name ^ " 2>/dev/null" in
+         let cmd = query_command_prefix ^ pkg_name ^ " 2>&1 > /dev/null" in
          match Unix.system cmd with
          | Unix.WEXITED 0 -> true (* installed *)
          | Unix.WEXITED 1 -> false (* not installed *)
