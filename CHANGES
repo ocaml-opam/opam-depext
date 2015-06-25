@@ -1,3 +1,8 @@
+0.6 (2015-06-25):
+* Detect already installed packages and skip them
+* Better OS detection, use `os-release`
+* Added a `--dryrun` option
+
 0.5 (2015-04-19):
 * Do not let `yum upgrade` go interactive.
 * Print commands before `sudo` so that they can be cut-and-pasted (#4).
