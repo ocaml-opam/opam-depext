@@ -84,11 +84,10 @@ let distribution = function
          let os_release_files = ["/etc/os-release"; "/usr/lib/os-release"] in
          if List.exists Sys.file_exists os_release_files then
            let file = List.find Sys.file_exists os_release_files in
-           let lines = lines_of_file file in
-           let kv_list = List.fold_left (fun acc l -> match string_split '=' l with
-                                                      | k::v::[] -> (k, v)::acc
-                                                      | _ -> acc) [] lines in
-	   List.assoc "ID" kv_list
+           let cmd = Printf.sprintf "eval `cat %s` && echo $ID" file in
+           match command_output cmd with
+           | "" -> raise (Failure ("Parsing " ^ file))
+           | id -> id
          else if has_command "lsb_release" then
            command_output "lsb_release -i -s"
          else let release_file = List.find Sys.file_exists
