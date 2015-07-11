@@ -1,3 +1,7 @@
+0.7 (2015-07-10):
+* Fix `os-release` detection by evaluating it through a shell rather
+  than parsing the file directly.  Repairs CentOS and RHEL detection.
+
 0.6 (2015-06-25):
 * Detect already installed packages and skip them
 * Better OS detection, use `os-release`
