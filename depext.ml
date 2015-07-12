@@ -209,28 +209,17 @@ let get_installed_packages distribution (packages: string list): string list =
     let lines = try lines_of_command "brew list" with _ -> [] in
     let installed = List.flatten (List.map (string_split ' ') lines) in
     List.filter (fun p -> List.mem p packages) installed
-  | Some (`Debian | `Ubuntu) ->
-    let cmd =
-      String.concat " "
-        ("dpkg-query -W -f '${Package} ${Status}\\n'" :: packages
-         @ ["2>/dev/null"])
-    in
-    let lines = try lines_of_command cmd with _ -> [] in
-    List.fold_left
-      (fun acc l -> match string_split ' ' l with
-         | [pkg;_;_;"installed"] -> pkg :: acc
-         | _ -> acc)
-      [] lines
-  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo) ->
+  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Ubuntu | `Debian) ->
     let query_command_prefix = match distribution with
       | Some (`Centos | `Fedora | `Mageia) -> "rpm -qi "
+      | Some (`Debian | `Ubuntu) -> "dpkg -l "
       | Some `Archlinux -> "pacman -Q "
       | Some `Gentoo -> "equery list "
       | _ -> assert(false)
     in
     List.filter
       (fun pkg_name ->
-         let cmd = query_command_prefix ^ pkg_name ^ " 2>/dev/null" in
+         let cmd = query_command_prefix ^ pkg_name ^ " 2>&1 > /dev/null" in
          match Unix.system cmd with
          | Unix.WEXITED 0 -> true (* installed *)
          | Unix.WEXITED 1 -> false (* not installed *)
