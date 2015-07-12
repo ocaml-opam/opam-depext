@@ -1,6 +1,8 @@
-0.7 (2015-07-10):
+0.7 (2015-07-12):
 * Fix `os-release` detection by evaluating it through a shell rather
   than parsing the file directly.  Repairs CentOS and RHEL detection.
+* Fix package detection on Ubuntu and Debian by doing a sequence of
+  `dpkg` queries instead of a combined one. (#23 via Francois Berenger).
 
 0.6 (2015-06-25):
 * Detect already installed packages and skip them
