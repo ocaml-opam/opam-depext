@@ -84,7 +84,7 @@ let distribution = function
          let os_release_files = ["/etc/os-release"; "/usr/lib/os-release"] in
          if List.exists Sys.file_exists os_release_files then
            let file = List.find Sys.file_exists os_release_files in
-           let cmd = Printf.sprintf "eval `cat %s` && echo $ID" file in
+           let cmd = Printf.sprintf ". %s && echo $ID" file in
            match command_output cmd with
            | "" -> raise (Failure ("Parsing " ^ file))
            | id -> id
@@ -148,13 +148,20 @@ let sourceflags = ["source"]
 
 (* processing *)
 
+let opam_version = lazy (
+  command_output "opam --version"
+)
+
 let depexts flags opam_packages =
   let c =
-    (* Two options here. list is lighter and doesn't require a lock, which might
-       be best if this is run as root *)
-    (* {[ Printf.sprintf "opam install --external=%s %s"
-           (String.concat "," flags)
-           (String.concat "," opam_packages) ]} *)
+    if String.sub (Lazy.force opam_version) 0 4 = "1.1." then
+      (* backwards-compatible command *)
+      Printf.sprintf "opam install --external=%s %s"
+        (String.concat "," flags)
+        (String.concat "," opam_packages)
+    else
+    (* this is lighter, more general and doesn't require a lock. But only on
+       newer opams *)
     Printf.sprintf "opam list --safe --recursive --external=%s --required-by=%s"
       (String.concat "," flags)
       (String.concat "," opam_packages)
@@ -211,6 +218,8 @@ let get_installed_packages distribution (packages: string list): string list =
     List.filter (fun p -> List.mem p packages) installed
   | Some (`Debian | `Ubuntu) ->
     let cmd =
+      (* ${db:Status-Status} would give only the column we're interested in, but
+         it's quite new in dpkg-query. *)
       String.concat " "
         ("dpkg-query -W -f '${Package} ${Status}\\n'" :: packages
          @ ["2>/dev/null"])
