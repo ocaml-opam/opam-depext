@@ -1,3 +1,7 @@
+0.8 (2015-07-27):
+* Detect and support opam 1.1.0
+* Revert unneeded #23
+
 0.7 (2015-07-12):
 * Fix `os-release` detection by evaluating it through a shell rather
   than parsing the file directly.  Repairs CentOS and RHEL detection.

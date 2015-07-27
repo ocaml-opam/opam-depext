@@ -430,7 +430,7 @@ let command =
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
         packages_arg),
-  Term.info "opam-depext" ~version:"0.7" ~doc ~man
+  Term.info "opam-depext" ~version:"0.8" ~doc ~man
 
 let () =
   match Term.eval command with
