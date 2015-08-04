@@ -105,6 +105,7 @@ let distribution = function
        | "arch" -> Some `Archlinux
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
+  | `OpenBSD -> Some `OpenBSD
   | _ -> None
 
 (* generate OPAM depexts flags *)
@@ -138,6 +139,7 @@ let distrflags = function
   | Some `Mageia -> ["mageia"]
   | Some `Archlinux -> ["archlinux"]
   | Some `Gentoo -> ["gentoo"]
+  | Some `OpenBSD -> ["openbsd"]
   | Some (`Other s) -> [String.lowercase s]
   | None -> []
 
@@ -248,7 +250,7 @@ let get_installed_packages distribution (packages: string list): string list =
   (* todo *)
   | Some `Macports -> []
   | Some `FreeBSD -> []
-  | Some (`OpenBsd | `NetBSD) -> []
+  | Some (`OpenBSD | `NetBSD) -> []
   | Some (`Other _) | None -> []
 
 let sudo os distribution cmd = match os, distribution with
@@ -430,7 +432,7 @@ let command =
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
         packages_arg),
-  Term.info "opam-depext" ~version:"0.8" ~doc ~man
+  Term.info "opam-depext" ~version:"0.8.1" ~doc ~man
 
 let () =
   match Term.eval command with

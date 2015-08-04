@@ -1,3 +1,6 @@
+0.8.1 (2015-08-03):
+* Repair OpenBSD depext support
+
 0.8 (2015-07-27):
 * Detect and support opam 1.1.0
 * Revert unneeded #23
