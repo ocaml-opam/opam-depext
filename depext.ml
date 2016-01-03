@@ -102,6 +102,7 @@ let distribution = function
        | "fedora" -> Some `Fedora
        | "mageia" -> Some `Mageia
        | "gentoo" -> Some `Gentoo
+       | "alpine" -> Some `Alpine
        | "arch" -> Some `Archlinux
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
@@ -137,6 +138,7 @@ let distrflags = function
   | Some `Centos -> ["centos"]
   | Some `Fedora -> ["fedora"]
   | Some `Mageia -> ["mageia"]
+  | Some `Alpine -> ["alpine"]
   | Some `Archlinux -> ["archlinux"]
   | Some `Gentoo -> ["gentoo"]
   | Some `OpenBSD -> ["openbsd"]
@@ -191,6 +193,8 @@ let install_packages_commands distribution packages =
     ["pacman"::"-S"::packages]
   | Some `Gentoo ->
     ["emerge"::packages]
+  | Some `Alpine ->
+    ["apk"::"add"::packages]
   | Some (`Other d) ->
     failwith ("Sorry, don't know how to install packages on your " ^ d ^ " system")
   | None ->
@@ -207,6 +211,8 @@ let update_command = function
      ["pacman"; "-S"]
   | Some `Gentoo ->
      ["emerge"; "-u"]
+  | Some `Alpine ->
+     ["apk"; "update"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
 exception Signaled_or_stopped of string * Unix.process_status
@@ -232,11 +238,12 @@ let get_installed_packages distribution (packages: string list): string list =
          | [pkg;_;_;"installed"] -> pkg :: acc
          | _ -> acc)
       [] lines
-  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo) ->
+  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Alpine) ->
     let query_command_prefix = match distribution with
       | Some (`Centos | `Fedora | `Mageia) -> "rpm -qi "
       | Some `Archlinux -> "pacman -Q "
       | Some `Gentoo -> "equery list "
+      | Some `Alpine -> "apk info -q "
       | _ -> assert(false)
     in
     List.filter
@@ -432,7 +439,7 @@ let command =
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
         packages_arg),
-  Term.info "opam-depext" ~version:"0.8.1" ~doc ~man
+  Term.info "opam-depext" ~version:"0.9.0" ~doc ~man
 
 let () =
   match Term.eval command with
