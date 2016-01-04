@@ -243,7 +243,7 @@ let get_installed_packages distribution (packages: string list): string list =
       | Some (`Centos | `Fedora | `Mageia) -> "rpm -qi "
       | Some `Archlinux -> "pacman -Q "
       | Some `Gentoo -> "equery list "
-      | Some `Alpine -> "apk info -q "
+      | Some `Alpine -> "apk info -e "
       | _ -> assert(false)
     in
     List.filter
