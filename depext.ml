@@ -303,9 +303,9 @@ let run_source_scripts = function
          don't need extra depexts *)
       if has_command "curl" then
         (* This still feels a bit frightening, said this way. *)
-        List.map (Printf.sprintf "curl -L \"%s\" | bash -ex -") source_urls
+        List.map (Printf.sprintf "curl -L \"%s\" | sh -ex -") source_urls
       else
-        List.map (Printf.sprintf "wget -O - \"%s\" | bash -ex -") source_urls
+        List.map (Printf.sprintf "wget -O - \"%s\" | sh -ex -") source_urls
     in
     List.iter (fun cmd ->
         match run_command [cmd] with
