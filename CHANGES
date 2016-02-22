@@ -1,6 +1,7 @@
 0.9.1 (2016-02-22):
 * Do not assume that `bash` is installed for source depexts (#35).
 * Add support for Red Hat Enterprise Linux via `rhel` tag (#32).
+* Add multi-distro Docker-based Travis file.
 
 0.9.0 (2016-01-04):
 * Add support for Alpine Linux.
