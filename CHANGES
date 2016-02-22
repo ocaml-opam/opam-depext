@@ -1,3 +1,6 @@
+0.9.1 (2016-02-22):
+* Do not assume that `bash` is installed for source depexts (#35).
+
 0.9.0 (2016-01-04):
 * Add support for Alpine Linux.
 
