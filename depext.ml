@@ -104,6 +104,7 @@ let distribution = function
        | "gentoo" -> Some `Gentoo
        | "alpine" -> Some `Alpine
        | "arch" -> Some `Archlinux
+       | "rhel" -> Some `RHEL
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
   | `OpenBSD -> Some `OpenBSD
@@ -137,6 +138,7 @@ let distrflags = function
   | Some `Ubuntu -> ["ubuntu"]
   | Some `Centos -> ["centos"]
   | Some `Fedora -> ["fedora"]
+  | Some `RHEL -> ["rhel"]
   | Some `Mageia -> ["mageia"]
   | Some `Alpine -> ["alpine"]
   | Some `Archlinux -> ["archlinux"]
@@ -182,7 +184,7 @@ let install_packages_commands distribution packages =
     ["port"::"install"::packages]
   | Some (`Debian | `Ubuntu) ->
     ["apt-get"::"install"::"-qq"::"-yy"::packages]
-  | Some (`Centos | `Fedora | `Mageia) ->
+  | Some (`Centos | `Fedora | `Mageia | `RHEL) ->
     ["yum"::"install"::"-y"::packages;
      "rpm"::"-q"::packages]
   | Some `FreeBSD ->
@@ -205,7 +207,7 @@ let update_command = function
      ["apt-get";"update"]
   | Some `Homebrew ->
      ["brew"; "update"]
-  | Some (`Centos | `Fedora | `Mageia) ->
+  | Some (`Centos | `Fedora | `Mageia | `RHEL) ->
      ["yum"; "-y"; "update"]
   | Some `Archlinux ->
      ["pacman"; "-S"]
@@ -238,9 +240,9 @@ let get_installed_packages distribution (packages: string list): string list =
          | [pkg;_;_;"installed"] -> pkg :: acc
          | _ -> acc)
       [] lines
-  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Alpine) ->
+  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Alpine | `RHEL) ->
     let query_command_prefix = match distribution with
-      | Some (`Centos | `Fedora | `Mageia) -> "rpm -qi "
+      | Some (`Centos | `Fedora | `Mageia | `RHEL) -> "rpm -qi "
       | Some `Archlinux -> "pacman -Q "
       | Some `Gentoo -> "equery list "
       | Some `Alpine -> "apk info -e "
@@ -303,9 +305,9 @@ let run_source_scripts = function
          don't need extra depexts *)
       if has_command "curl" then
         (* This still feels a bit frightening, said this way. *)
-        List.map (Printf.sprintf "curl -L \"%s\" | bash -ex -") source_urls
+        List.map (Printf.sprintf "curl -L \"%s\" | sh -ex -") source_urls
       else
-        List.map (Printf.sprintf "wget -O - \"%s\" | bash -ex -") source_urls
+        List.map (Printf.sprintf "wget -O - \"%s\" | sh -ex -") source_urls
     in
     List.iter (fun cmd ->
         match run_command [cmd] with
@@ -439,7 +441,7 @@ let command =
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
         packages_arg),
-  Term.info "opam-depext" ~version:"0.9.0" ~doc ~man
+  Term.info "opam-depext" ~version:"0.9.1" ~doc ~man
 
 let () =
   match Term.eval command with
