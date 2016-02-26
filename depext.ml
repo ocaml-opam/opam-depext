@@ -321,8 +321,15 @@ let run_source_scripts = function
 
 let main print_flags list short no_sources
     debug_arg install_arg update_arg dryrun_arg
-    opam_packages =
+    jobs_arg verbose_arg yes_arg opam_packages =
   if debug_arg then debug := true;
+  let opam_flags =
+    (match jobs_arg with
+    | Some j -> ["-j";string_of_int j]
+    | None -> []) @
+    (match verbose_arg with true -> ["-v"] | false -> []) @
+    (match yes_arg with true -> ["-y"] | false -> [])
+  in
   let arch = arch () in
   let os = os () in
   let distribution = distribution os in
@@ -371,9 +378,12 @@ let main print_flags list short no_sources
   if os_packages <> [] && update_arg then update os distribution;
   install os distribution os_packages;
   run_source_scripts source_urls;
-  if install_arg && opam_packages <> [] then
-    (Printf.printf "# Now letting OPAM install the packages";
-     Unix.execvp "opam" (Array.of_list ("opam"::"install"::opam_packages)))
+  let opam_cmdline = "opam"::"install":: opam_flags @ opam_packages in
+  if install_arg && opam_packages <> [] then begin
+    (if not short then Printf.printf "# Now letting OPAM install the packages\n%!");
+    (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
+    Unix.execvp "opam" (Array.of_list opam_cmdline)
+  end
 
 open Cmdliner
 
@@ -412,6 +422,40 @@ let install_arg =
        info ~doc:"Install the packages through \"opam install\" after \
                   installing external dependencies" ["i";"install"])
 
+let mk_opt ?section ?vopt flags value doc conv default =
+  let doc = Arg.info ?docs:section ~docv:value ~doc flags in
+  Arg.(value & opt ?vopt conv default & doc)
+
+let jobs_arg =
+  let positive : int Arg.converter =
+    let (parser, printer) = Arg.int in
+    let parser s =
+      match parser s with
+      | `Error _ -> `Error "expected a positive integer"
+      | `Ok n as r -> if n <= 0
+        then `Error "expected a positive integer"
+        else r in
+    (parser, printer) in
+  mk_opt ["j";"jobs"] "JOBS"
+    "Set the maximal number of concurrent jobs to use when installing packages.
+     You can also set it using the $(b,\\$OPAMJOBS) environment variable.
+     This setting only applies when the $(i,-i) flag is also passed."
+    Arg.(some positive) None
+
+let verbose_arg = 
+  Arg.(value & flag &
+       info ~doc:"Display the build output of source packages as they are
+     being compiled. You can set it using the $(b,\\$OPAMVERBOSE) environment
+     variable.  This setting only applies when the $(i,-i) flag is also passed."
+     ["v";"verbose"])
+
+let yes_arg =
+  Arg.(value & flag &
+       info ~doc:"Disable interactive mode and answer yes to all questions that
+     would otherwise be asked to the user. This is equivalent to setting
+     \\$OPAMYES to \"true\".  This setting only applies when the $(i,-i) flag is
+     also passed." ["y";"yes"])
+
 let dryrun_arg =
   Arg.(value & flag &
        info ~doc:"Only list the new system packages (and source scripts) that \
@@ -440,8 +484,8 @@ let command =
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
-        packages_arg),
-  Term.info "opam-depext" ~version:"0.9.1" ~doc ~man
+        jobs_arg $ verbose_arg $ yes_arg $ packages_arg),
+  Term.info "opam-depext" ~version:"1.0.0" ~doc ~man
 
 let () =
   match Term.eval command with
