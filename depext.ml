@@ -55,6 +55,16 @@ let run_command ?(no_stderr=false) c =
   if !debug then Printf.eprintf "+ %s\n%!" c;
   Unix.system c
 
+let ask ?(default=false) fmt =
+  Printf.ksprintf (fun s ->
+      Printf.printf "%s [%s] %!" s (if default then "Y/n" else "y/N");
+      try match String.lowercase (read_line ()) with
+        | "y" | "yes" -> true
+        | "n" | "no" -> false
+        | _  -> default
+      with End_of_file -> false)
+    fmt
+
 (* system detection *)
 
 let arch () =
@@ -275,39 +285,35 @@ let get_installed_packages distribution (packages: string list): string list =
   | Some (`OpenBSD | `NetBSD) -> []
   | Some (`Other _) | None -> []
 
-let has_sudo = lazy (
-  has_command "sudo" &&
-  run_command ~no_stderr:true ["sudo"; "-v"] = Unix.WEXITED 0
-)
-
-let sudo_run_command os distribution cmd =
+let sudo_run_command ~su ~interactive os distribution cmd =
   let cmd =
     match os, distribution with
     | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
     | `Darwin, Some `Macports ->
       (* not sure about this list *)
       if Unix.getuid () <> 0 then (
-        Printf.printf "Root rights are required for the following command:\n\
-                      \    %s\n%!"
-          (String.concat " " cmd);
-        if Lazy.force has_sudo then "sudo"::cmd
-        else (
-          Printf.printf "'sudo' not found, using 'su'.\n%!";
+        Printf.printf
+          "The following command needs to be run through %S:\n    %s\n%!"
+          (if su then "su" else "sudo") (String.concat " " cmd);
+        if interactive && not (ask ~default:true "Allow ?") then
+          exit 1;
+        if su then
           ["su"; "-c"; Printf.sprintf "%S" (String.concat " " cmd)]
-        )
+        else
+          "sudo"::cmd
       ) else cmd
     | _ -> cmd
   in
   run_command cmd
 
-let update os distribution =
+let update ~su ~interactive os distribution =
   let cmd = update_command distribution in
-  match sudo_run_command os distribution cmd with
+  match sudo_run_command ~su ~interactive os distribution cmd with
   | Unix.WEXITED 0 ->
     Printf.printf "# OS package update successful\n%!"
   | _ -> fatal_error "OS package update failed"
 
-let install ~interactive os distribution = function
+let install ~su ~interactive os distribution = function
   | [] -> ()
   | os_packages ->
     let cmds =
@@ -316,7 +322,8 @@ let install ~interactive os distribution = function
     let is_success r = (r = Unix.WEXITED 0) in
     let ok =
       List.fold_left (fun ok cmd ->
-          ok && is_success (sudo_run_command os distribution cmd))
+          ok &&
+          is_success (sudo_run_command ~su ~interactive os distribution cmd))
         true cmds
     in
     if ok then Printf.printf "# OS packages installation successful\n%!"
@@ -346,7 +353,7 @@ let run_source_scripts = function
 
 let main print_flags list short no_sources
     debug_arg install_arg update_arg dryrun_arg
-    jobs_arg interactive_arg verbose_arg yes_arg opam_packages =
+    jobs_arg su_arg interactive_arg verbose_arg yes_arg opam_packages =
   if debug_arg then debug := true;
   let opam_flags =
     (match jobs_arg with
@@ -400,12 +407,14 @@ let main print_flags list short no_sources
       Printf.printf
         "# All required OS packages found.\n%!";
   if dryrun_arg then exit (if os_packages = [] then 0 else 1);
+  let su = su_arg || not (has_command "sudo") in
   let interactive = match interactive_arg with
     | Some i -> i
     | None -> Unix.isatty Unix.stdin
   in
-  if os_packages <> [] && update_arg then update os distribution;
-  install ~interactive os distribution os_packages;
+  if os_packages <> [] && update_arg then
+    update ~su ~interactive os distribution;
+  install ~su ~interactive os distribution os_packages;
   run_source_scripts source_urls;
   let opam_cmdline = "opam"::"install":: opam_flags @ opam_packages in
   if install_arg && opam_packages <> [] then begin
@@ -450,6 +459,11 @@ let install_arg =
   Arg.(value & flag &
        info ~doc:"Install the packages through \"opam install\" after \
                   installing external dependencies" ["i";"install"])
+
+let su_arg =
+  Arg.(value & flag &
+       info ~doc:"Attempt 'su' rather than 'sudo' when requiring root rights"
+         ["su"])
 
 let interactive_arg =
   Arg.(value & vflag None [
@@ -525,7 +539,7 @@ let command =
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
-        jobs_arg $ interactive_arg $ verbose_arg $ yes_arg $ packages_arg),
+        jobs_arg $ su_arg $ interactive_arg $ verbose_arg $ yes_arg $ packages_arg),
   Term.info "opam-depext" ~version:"1.0.0" ~doc ~man
 
 let () =
