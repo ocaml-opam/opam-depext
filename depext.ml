@@ -24,10 +24,15 @@ let lines_of_file f =
   close_in ic;
   lines
 
+exception Fatal_error of string
+
+let fatal_error fmt =
+  Printf.ksprintf (fun s -> raise (Fatal_error s)) fmt
+
 let command_output c =
   match lines_of_command c with
   | [s] -> s
-  | _ -> failwith (Printf.sprintf "Command %S failed" c)
+  | _ -> fatal_error "Command %S failed" c
 
 let string_split char str =
   let rec aux pos =
@@ -203,9 +208,9 @@ let install_packages_commands ~interactive distribution packages =
   | Some `Alpine ->
     ["apk"::"add"::packages]
   | Some (`Other d) ->
-    failwith ("Sorry, don't know how to install packages on your " ^ d ^ " system")
+    fatal_error "Sorry, don't know how to install packages on your %s  system" d
   | None ->
-    failwith "Sorry, don't know how to install packages on your system"
+    fatal_error "Sorry, don't know how to install packages on your system"
 
 let update_command = function
   | Some (`Debian | `Ubuntu) ->
@@ -288,7 +293,7 @@ let update os distribution =
   match run_command cmd with
   | Unix.WEXITED 0 ->
     Printf.printf "# OS package update successful\n%!"
-  | _ -> failwith "OS package update failed"
+  | _ -> fatal_error "OS package update failed"
 
 let install ~interactive os distribution = function
   | [] -> ()
@@ -304,7 +309,7 @@ let install ~interactive os distribution = function
         true cmds
     in
     if ok then Printf.printf "# OS packages installation successful\n%!"
-    else failwith "OS package installation failed"
+    else fatal_error "OS package installation failed"
 
 let run_source_scripts = function
   | [] -> ()
@@ -321,7 +326,7 @@ let run_source_scripts = function
     List.iter (fun cmd ->
         match run_command [cmd] with
         | Unix.WEXITED 0 -> ()
-        | _ -> failwith (Printf.sprintf "Command %S failed" cmd))
+        | _ -> fatal_error "Command %S failed" cmd)
       commands;
     Printf.printf "Source installation scripts run successfully\n%!"
 
@@ -467,7 +472,7 @@ let jobs_arg =
      This setting only applies when the $(i,-i) flag is also passed."
     Arg.(some positive) None
 
-let verbose_arg = 
+let verbose_arg =
   Arg.(value & flag &
        info ~doc:"Display the build output of source packages as they are
      being compiled. You can set it using the $(b,\\$OPAMVERBOSE) environment
@@ -513,7 +518,16 @@ let command =
   Term.info "opam-depext" ~version:"1.0.0" ~doc ~man
 
 let () =
-  match Term.eval command with
-  | `Ok () | `Version | `Help -> exit 0
-  | `Error (`Parse | `Term) -> exit 2
-  | `Error `Exn -> exit 1
+  Sys.catch_break true;
+  try
+    match Term.eval ~catch:false command with
+    | `Ok () | `Version | `Help -> exit 0
+    | `Error (`Parse | `Term) -> exit 2
+    | `Error `Exn -> exit 1
+  with
+  | Sys.Break ->
+    prerr_endline "Interrupted.";
+    exit 130
+  | Fatal_error m ->
+    prerr_endline m;
+    exit 1
