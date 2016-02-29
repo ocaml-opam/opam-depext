@@ -15,7 +15,7 @@ let lines_of_command c =
   if !debug then Printf.eprintf "+ %s\n%!" c;
   let ic = Unix.open_process_in c in
   let lines = lines_of_channel ic in
-  close_in ic;
+  ignore (Unix.close_process_in ic);
   lines
 
 let lines_of_file f =
