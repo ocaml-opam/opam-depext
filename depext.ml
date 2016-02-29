@@ -49,8 +49,9 @@ let has_command c =
   let cmd = Printf.sprintf "command -v %s >/dev/null" c in
   try Sys.command cmd = 0 with Sys_error _ -> false
 
-let run_command c =
-  let c = String.concat " " (List.map (Printf.sprintf "%s") c) in
+let run_command ?(no_stderr=false) c =
+  let c = if no_stderr then c @ ["2>/dev/null"] else c in
+  let c = String.concat " " c in
   if !debug then Printf.eprintf "+ %s\n%!" c;
   Unix.system c
 
@@ -227,7 +228,7 @@ let update_command = function
      ["apk"; "update"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
-exception Signaled_or_stopped of string * Unix.process_status
+exception Signaled_or_stopped of string list * Unix.process_status
 
 (* filter 'packages' to retain only the installed ones *)
 let get_installed_packages distribution (packages: string list): string list =
@@ -252,16 +253,16 @@ let get_installed_packages distribution (packages: string list): string list =
       [] lines
   | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Alpine | `RHEL) ->
     let query_command_prefix = match distribution with
-      | Some (`Centos | `Fedora | `Mageia | `RHEL) -> "rpm -qi "
-      | Some `Archlinux -> "pacman -Q "
-      | Some `Gentoo -> "equery list "
-      | Some `Alpine -> "apk info -e "
+      | Some (`Centos | `Fedora | `Mageia | `RHEL) -> ["rpm"; "-qi"]
+      | Some `Archlinux -> ["pacman"; "-Q"]
+      | Some `Gentoo -> ["equery"; "list"]
+      | Some `Alpine -> ["apk"; "info"; "-e"]
       | _ -> assert(false)
     in
     List.filter
       (fun pkg_name ->
-         let cmd = query_command_prefix ^ pkg_name ^ " 2>/dev/null" in
-         match Unix.system cmd with
+         let cmd = query_command_prefix @ [pkg_name] in
+         match run_command ~no_stderr:true cmd with
          | Unix.WEXITED 0 -> true (* installed *)
          | Unix.WEXITED 1 -> false (* not installed *)
          | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
@@ -274,23 +275,34 @@ let get_installed_packages distribution (packages: string list): string list =
   | Some (`OpenBSD | `NetBSD) -> []
   | Some (`Other _) | None -> []
 
-let sudo os distribution cmd = match os, distribution with
-  | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
-  | `Darwin, Some `Macports ->
-    (* not sure about this list *)
-    if Unix.getuid () <> 0 then (
-      Printf.printf "Not running as root, \
-                     the following command will be run through \"sudo\":\n\
-                    \    %s\n%!"
-        (String.concat " " cmd);
-      "sudo"::cmd
-    ) else cmd
-  | _ -> cmd
+let has_sudo = lazy (
+  has_command "sudo" &&
+  run_command ~no_stderr:true ["sudo"; "-v"] = Unix.WEXITED 0
+)
+
+let sudo_run_command os distribution cmd =
+  let cmd =
+    match os, distribution with
+    | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
+    | `Darwin, Some `Macports ->
+      (* not sure about this list *)
+      if Unix.getuid () <> 0 then (
+        Printf.printf "Root rights are required for the following command:\n\
+                      \    %s\n%!"
+          (String.concat " " cmd);
+        if Lazy.force has_sudo then "sudo"::cmd
+        else (
+          Printf.printf "'sudo' not found, using 'su'.\n%!";
+          ["su"; "-c"; Printf.sprintf "%S" (String.concat " " cmd)]
+        )
+      ) else cmd
+    | _ -> cmd
+  in
+  run_command cmd
 
 let update os distribution =
   let cmd = update_command distribution in
-  let cmd = sudo os distribution cmd in
-  match run_command cmd with
+  match sudo_run_command os distribution cmd with
   | Unix.WEXITED 0 ->
     Printf.printf "# OS package update successful\n%!"
   | _ -> fatal_error "OS package update failed"
@@ -301,11 +313,10 @@ let install ~interactive os distribution = function
     let cmds =
       install_packages_commands ~interactive distribution os_packages
     in
-    let cmds = List.map (sudo os distribution) cmds in
     let is_success r = (r = Unix.WEXITED 0) in
     let ok =
       List.fold_left (fun ok cmd ->
-          if ok then is_success (run_command cmd) else false)
+          ok && is_success (sudo_run_command os distribution cmd))
         true cmds
     in
     if ok then Printf.printf "# OS packages installation successful\n%!"
