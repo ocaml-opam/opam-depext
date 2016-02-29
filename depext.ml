@@ -108,6 +108,7 @@ let distribution = function
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
   | `OpenBSD -> Some `OpenBSD
+  | `FreeBSD -> Some `FreeBSD
   | _ -> None
 
 (* generate OPAM depexts flags *)
@@ -144,6 +145,7 @@ let distrflags = function
   | Some `Archlinux -> ["archlinux"]
   | Some `Gentoo -> ["gentoo"]
   | Some `OpenBSD -> ["openbsd"]
+  | Some `FreeBSD -> ["freebsd"]
   | Some (`Other s) -> [String.lowercase s]
   | None -> []
 
@@ -256,9 +258,11 @@ let get_installed_packages distribution (packages: string list): string list =
          | Unix.WEXITED 1 -> false (* not installed *)
          | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
       ) packages
+  | Some `FreeBSD ->
+    let installed = try lines_of_command "pkg query %n" with _ -> [] in
+    List.filter (fun p -> List.mem p packages) installed
   (* todo *)
   | Some `Macports -> []
-  | Some `FreeBSD -> []
   | Some (`OpenBSD | `NetBSD) -> []
   | Some (`Other _) | None -> []
 
