@@ -178,16 +178,19 @@ let depexts flags opam_packages =
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
   List.flatten (List.map (string_split ' ') lines)
 
-let install_packages_commands distribution packages =
+let install_packages_commands ~interactive distribution packages =
+  let yes opt r =
+    if not interactive then opt @ r else r
+  in
   match distribution with
   | Some `Homebrew ->
     ["brew"::"install"::packages]
   | Some `Macports ->
     ["port"::"install"::packages]
   | Some (`Debian | `Ubuntu) ->
-    ["apt-get"::"install"::"-qq"::"-yy"::packages]
+    ["apt-get"::"install"::yes ["-qq"; "-yy"] packages]
   | Some (`Centos | `Fedora | `Mageia | `RHEL) ->
-    ["yum"::"install"::"-y"::packages;
+    ["yum"::"install"::yes ["-y"] packages;
      "rpm"::"-q"::packages]
   | Some `FreeBSD ->
     ["pkg"::"install"::packages]
@@ -287,10 +290,12 @@ let update os distribution =
     Printf.printf "# OS package update successful\n%!"
   | _ -> failwith "OS package update failed"
 
-let install os distribution = function
+let install ~interactive os distribution = function
   | [] -> ()
   | os_packages ->
-    let cmds = install_packages_commands distribution os_packages in
+    let cmds =
+      install_packages_commands ~interactive distribution os_packages
+    in
     let cmds = List.map (sudo os distribution) cmds in
     let is_success r = (r = Unix.WEXITED 0) in
     let ok =
@@ -325,7 +330,7 @@ let run_source_scripts = function
 
 let main print_flags list short no_sources
     debug_arg install_arg update_arg dryrun_arg
-    jobs_arg verbose_arg yes_arg opam_packages =
+    jobs_arg interactive_arg verbose_arg yes_arg opam_packages =
   if debug_arg then debug := true;
   let opam_flags =
     (match jobs_arg with
@@ -379,8 +384,12 @@ let main print_flags list short no_sources
       Printf.printf
         "# All required OS packages found.\n%!";
   if dryrun_arg then exit (if os_packages = [] then 0 else 1);
+  let interactive = match interactive_arg with
+    | Some i -> i
+    | None -> Unix.isatty Unix.stdin
+  in
   if os_packages <> [] && update_arg then update os distribution;
-  install os distribution os_packages;
+  install ~interactive os distribution os_packages;
   run_source_scripts source_urls;
   let opam_cmdline = "opam"::"install":: opam_flags @ opam_packages in
   if install_arg && opam_packages <> [] then begin
@@ -425,6 +434,18 @@ let install_arg =
   Arg.(value & flag &
        info ~doc:"Install the packages through \"opam install\" after \
                   installing external dependencies" ["i";"install"])
+
+let interactive_arg =
+  Arg.(value & vflag None [
+      Some true, info
+        ~doc:"Run the system package manager interactively (default if run \
+              from a tty)"
+        ["interactive";"I"];
+      Some false, info
+        ~doc:"Run the system package manager non-interactively \
+              (default when not running from a tty)"
+        ["noninteractive"];
+    ])
 
 let mk_opt ?section ?vopt flags value doc conv default =
   let doc = Arg.info ?docs:section ~docv:value ~doc flags in
@@ -488,7 +509,7 @@ let command =
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
-        jobs_arg $ verbose_arg $ yes_arg $ packages_arg),
+        jobs_arg $ interactive_arg $ verbose_arg $ yes_arg $ packages_arg),
   Term.info "opam-depext" ~version:"1.0.0" ~doc ~man
 
 let () =
