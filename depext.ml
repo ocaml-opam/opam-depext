@@ -353,15 +353,8 @@ let run_source_scripts = function
 
 let main print_flags list short no_sources
     debug_arg install_arg update_arg dryrun_arg
-    jobs_arg su_arg interactive_arg verbose_arg yes_arg opam_packages =
+    su_arg interactive_arg opam_args opam_packages =
   if debug_arg then debug := true;
-  let opam_flags =
-    (match jobs_arg with
-    | Some j -> ["-j";string_of_int j]
-    | None -> []) @
-    (match verbose_arg with true -> ["-v"] | false -> []) @
-    (match yes_arg with true -> ["-y"] | false -> [])
-  in
   let arch = arch () in
   let os = os () in
   let distribution = distribution os in
@@ -416,7 +409,7 @@ let main print_flags list short no_sources
     update ~su ~interactive os distribution;
   install ~su ~interactive os distribution os_packages;
   run_source_scripts source_urls;
-  let opam_cmdline = "opam"::"install":: opam_flags @ opam_packages in
+  let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
   if install_arg && opam_packages <> [] then begin
     (if not short then Printf.printf "# Now letting OPAM install the packages\n%!");
     (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
@@ -477,40 +470,6 @@ let interactive_arg =
         ["noninteractive"];
     ])
 
-let mk_opt ?section ?vopt flags value doc conv default =
-  let doc = Arg.info ?docs:section ~docv:value ~doc flags in
-  Arg.(value & opt ?vopt conv default & doc)
-
-let jobs_arg =
-  let positive : int Arg.converter =
-    let (parser, printer) = Arg.int in
-    let parser s =
-      match parser s with
-      | `Error _ -> `Error "expected a positive integer"
-      | `Ok n as r -> if n <= 0
-        then `Error "expected a positive integer"
-        else r in
-    (parser, printer) in
-  mk_opt ["j";"jobs"] "JOBS"
-    "Set the maximal number of concurrent jobs to use when installing packages.
-     You can also set it using the $(b,\\$OPAMJOBS) environment variable.
-     This setting only applies when the $(i,-i) flag is also passed."
-    Arg.(some positive) None
-
-let verbose_arg =
-  Arg.(value & flag &
-       info ~doc:"Display the build output of source packages as they are
-     being compiled. You can set it using the $(b,\\$OPAMVERBOSE) environment
-     variable.  This setting only applies when the $(i,-i) flag is also passed."
-     ["v";"verbose"])
-
-let yes_arg =
-  Arg.(value & flag &
-       info ~doc:"Disable interactive mode and answer yes to all questions that
-     would otherwise be asked to the user. This is equivalent to setting
-     \\$OPAMYES to \"true\".  This setting only applies when the $(i,-i) flag is
-     also passed." ["y";"yes"])
-
 let dryrun_arg =
   Arg.(value & flag &
        info ~doc:"Only list the new system packages (and source scripts) that \
@@ -518,6 +477,29 @@ let dryrun_arg =
                   with 0 if all required system packages are already installed, \
                   1 otherwise."
          ["n";"dry-run"])
+
+let opam_args =
+  let docs = "OPAM OPTIONS" in
+  let flags =
+    List.map
+      (fun fs ->
+         let term = Arg.(value & flag_all & info ~docs fs) in
+         Term.(pure (List.map (fun _ -> "--"^List.hd fs))
+               $ term))
+      [ ["verbose";"v"];
+        ["yes";"y"] ]
+  in
+  let options =
+    List.map
+      (fun fs ->
+         let term = Arg.(value & opt_all string [] & info ~docs fs) in
+         Term.(pure (List.map (Printf.sprintf "--%s=%s" (List.hd fs)))
+               $ term))
+      [ ["jobs";"j"] ]
+  in
+  List.fold_left (fun acc t ->
+      Term.(pure (@) $ acc $ t))
+    Term.(pure []) (flags @ options)
 
 let command =
   let man = [
@@ -527,6 +509,9 @@ let command =
         perform OS and distribution detection, query OPAM for the right \
         external dependencies on a set of packages, and call the OS package \
         manager in the appropriate way to install then.";
+    `S "OPAM OPTIONS";
+    `P "These options are passed through to the child opam process when \
+        used in conjunction with the $(i,-i) flag.";
     `S "COPYRIGHT";
     `P "$(b,opam-depext) is written by Louis Gesbert <louis.gesbert@ocamlpro.com>, \
         copyright OCamlPro 2014-2015 with contributions from Anil Madhavapeddy, \
@@ -539,7 +524,8 @@ let command =
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
-        jobs_arg $ su_arg $ interactive_arg $ verbose_arg $ yes_arg $ packages_arg),
+        su_arg $ interactive_arg $ opam_args $
+        packages_arg),
   Term.info "opam-depext" ~version:"1.0.0" ~doc ~man
 
 let () =
