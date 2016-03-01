@@ -15,7 +15,7 @@ let lines_of_command c =
   if !debug then Printf.eprintf "+ %s\n%!" c;
   let ic = Unix.open_process_in c in
   let lines = lines_of_channel ic in
-  close_in ic;
+  ignore (Unix.close_process_in ic);
   lines
 
 let lines_of_file f =
@@ -24,10 +24,15 @@ let lines_of_file f =
   close_in ic;
   lines
 
+exception Fatal_error of string
+
+let fatal_error fmt =
+  Printf.ksprintf (fun s -> raise (Fatal_error s)) fmt
+
 let command_output c =
   match lines_of_command c with
   | [s] -> s
-  | _ -> failwith (Printf.sprintf "Command %S failed" c)
+  | _ -> fatal_error "Command %S failed" c
 
 let string_split char str =
   let rec aux pos =
@@ -44,10 +49,21 @@ let has_command c =
   let cmd = Printf.sprintf "command -v %s >/dev/null" c in
   try Sys.command cmd = 0 with Sys_error _ -> false
 
-let run_command c =
-  let c = String.concat " " (List.map (Printf.sprintf "%s") c) in
+let run_command ?(no_stderr=false) c =
+  let c = if no_stderr then c @ ["2>/dev/null"] else c in
+  let c = String.concat " " c in
   if !debug then Printf.eprintf "+ %s\n%!" c;
   Unix.system c
+
+let ask ?(default=false) fmt =
+  Printf.ksprintf (fun s ->
+      Printf.printf "%s [%s] %!" s (if default then "Y/n" else "y/N");
+      try match String.lowercase (read_line ()) with
+        | "y" | "yes" -> true
+        | "n" | "no" -> false
+        | _  -> default
+      with End_of_file -> false)
+    fmt
 
 (* system detection *)
 
@@ -178,16 +194,19 @@ let depexts flags opam_packages =
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
   List.flatten (List.map (string_split ' ') lines)
 
-let install_packages_commands distribution packages =
+let install_packages_commands ~interactive distribution packages =
+  let yes opt r =
+    if not interactive then opt @ r else r
+  in
   match distribution with
   | Some `Homebrew ->
     ["brew"::"install"::packages]
   | Some `Macports ->
     ["port"::"install"::packages]
   | Some (`Debian | `Ubuntu) ->
-    ["apt-get"::"install"::"-qq"::"-yy"::packages]
+    ["apt-get"::"install"::yes ["-qq"; "-yy"] packages]
   | Some (`Centos | `Fedora | `Mageia | `RHEL) ->
-    ["yum"::"install"::"-y"::packages;
+    ["yum"::"install"::yes ["-y"] packages;
      "rpm"::"-q"::packages]
   | Some `FreeBSD ->
     ["pkg"::"install"::packages]
@@ -200,9 +219,9 @@ let install_packages_commands distribution packages =
   | Some `Alpine ->
     ["apk"::"add"::packages]
   | Some (`Other d) ->
-    failwith ("Sorry, don't know how to install packages on your " ^ d ^ " system")
+    fatal_error "Sorry, don't know how to install packages on your %s  system" d
   | None ->
-    failwith "Sorry, don't know how to install packages on your system"
+    fatal_error "Sorry, don't know how to install packages on your system"
 
 let update_command = function
   | Some (`Debian | `Ubuntu) ->
@@ -219,7 +238,7 @@ let update_command = function
      ["apk"; "update"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
-exception Signaled_or_stopped of string * Unix.process_status
+exception Signaled_or_stopped of string list * Unix.process_status
 
 (* filter 'packages' to retain only the installed ones *)
 let get_installed_packages distribution (packages: string list): string list =
@@ -244,16 +263,16 @@ let get_installed_packages distribution (packages: string list): string list =
       [] lines
   | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Alpine | `RHEL) ->
     let query_command_prefix = match distribution with
-      | Some (`Centos | `Fedora | `Mageia | `RHEL) -> "rpm -qi "
-      | Some `Archlinux -> "pacman -Q "
-      | Some `Gentoo -> "equery list "
-      | Some `Alpine -> "apk info -e "
+      | Some (`Centos | `Fedora | `Mageia | `RHEL) -> ["rpm"; "-qi"]
+      | Some `Archlinux -> ["pacman"; "-Q"]
+      | Some `Gentoo -> ["equery"; "list"]
+      | Some `Alpine -> ["apk"; "info"; "-e"]
       | _ -> assert(false)
     in
     List.filter
       (fun pkg_name ->
-         let cmd = query_command_prefix ^ pkg_name ^ " 2>/dev/null" in
-         match Unix.system cmd with
+         let cmd = query_command_prefix @ [pkg_name] in
+         match run_command ~no_stderr:true cmd with
          | Unix.WEXITED 0 -> true (* installed *)
          | Unix.WEXITED 1 -> false (* not installed *)
          | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
@@ -266,40 +285,49 @@ let get_installed_packages distribution (packages: string list): string list =
   | Some (`OpenBSD | `NetBSD) -> []
   | Some (`Other _) | None -> []
 
-let sudo os distribution cmd = match os, distribution with
-  | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
-  | `Darwin, Some `Macports ->
-    (* not sure about this list *)
-    if Unix.getuid () <> 0 then (
-      Printf.printf "Not running as root, \
-                     the following command will be run through \"sudo\":\n\
-                    \    %s\n%!"
-        (String.concat " " cmd);
-      "sudo"::cmd
-    ) else cmd
-  | _ -> cmd
+let sudo_run_command ~su ~interactive os distribution cmd =
+  let cmd =
+    match os, distribution with
+    | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
+    | `Darwin, Some `Macports ->
+      (* not sure about this list *)
+      if Unix.getuid () <> 0 then (
+        Printf.printf
+          "The following command needs to be run through %S:\n    %s\n%!"
+          (if su then "su" else "sudo") (String.concat " " cmd);
+        if interactive && not (ask ~default:true "Allow ?") then
+          exit 1;
+        if su then
+          ["su"; "-c"; Printf.sprintf "%S" (String.concat " " cmd)]
+        else
+          "sudo"::cmd
+      ) else cmd
+    | _ -> cmd
+  in
+  run_command cmd
 
-let update os distribution =
+let update ~su ~interactive os distribution =
   let cmd = update_command distribution in
-  let cmd = sudo os distribution cmd in
-  match run_command cmd with
+  match sudo_run_command ~su ~interactive os distribution cmd with
   | Unix.WEXITED 0 ->
     Printf.printf "# OS package update successful\n%!"
-  | _ -> failwith "OS package update failed"
+  | _ -> fatal_error "OS package update failed"
 
-let install os distribution = function
+let install ~su ~interactive os distribution = function
   | [] -> ()
   | os_packages ->
-    let cmds = install_packages_commands distribution os_packages in
-    let cmds = List.map (sudo os distribution) cmds in
+    let cmds =
+      install_packages_commands ~interactive distribution os_packages
+    in
     let is_success r = (r = Unix.WEXITED 0) in
     let ok =
       List.fold_left (fun ok cmd ->
-          if ok then is_success (run_command cmd) else false)
+          ok &&
+          is_success (sudo_run_command ~su ~interactive os distribution cmd))
         true cmds
     in
     if ok then Printf.printf "# OS packages installation successful\n%!"
-    else failwith "OS package installation failed"
+    else fatal_error "OS package installation failed"
 
 let run_source_scripts = function
   | [] -> ()
@@ -316,7 +344,7 @@ let run_source_scripts = function
     List.iter (fun cmd ->
         match run_command [cmd] with
         | Unix.WEXITED 0 -> ()
-        | _ -> failwith (Printf.sprintf "Command %S failed" cmd))
+        | _ -> fatal_error "Command %S failed" cmd)
       commands;
     Printf.printf "Source installation scripts run successfully\n%!"
 
@@ -325,15 +353,8 @@ let run_source_scripts = function
 
 let main print_flags list short no_sources
     debug_arg install_arg update_arg dryrun_arg
-    jobs_arg verbose_arg yes_arg opam_packages =
+    su_arg interactive_arg opam_args opam_packages =
   if debug_arg then debug := true;
-  let opam_flags =
-    (match jobs_arg with
-    | Some j -> ["-j";string_of_int j]
-    | None -> []) @
-    (match verbose_arg with true -> ["-v"] | false -> []) @
-    (match yes_arg with true -> ["-y"] | false -> [])
-  in
   let arch = arch () in
   let os = os () in
   let distribution = distribution os in
@@ -379,10 +400,16 @@ let main print_flags list short no_sources
       Printf.printf
         "# All required OS packages found.\n%!";
   if dryrun_arg then exit (if os_packages = [] then 0 else 1);
-  if os_packages <> [] && update_arg then update os distribution;
-  install os distribution os_packages;
+  let su = su_arg || not (has_command "sudo") in
+  let interactive = match interactive_arg with
+    | Some i -> i
+    | None -> Unix.isatty Unix.stdin
+  in
+  if os_packages <> [] && update_arg then
+    update ~su ~interactive os distribution;
+  install ~su ~interactive os distribution os_packages;
   run_source_scripts source_urls;
-  let opam_cmdline = "opam"::"install":: opam_flags @ opam_packages in
+  let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
   if install_arg && opam_packages <> [] then begin
     (if not short then Printf.printf "# Now letting OPAM install the packages\n%!");
     (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
@@ -426,39 +453,22 @@ let install_arg =
        info ~doc:"Install the packages through \"opam install\" after \
                   installing external dependencies" ["i";"install"])
 
-let mk_opt ?section ?vopt flags value doc conv default =
-  let doc = Arg.info ?docs:section ~docv:value ~doc flags in
-  Arg.(value & opt ?vopt conv default & doc)
-
-let jobs_arg =
-  let positive : int Arg.converter =
-    let (parser, printer) = Arg.int in
-    let parser s =
-      match parser s with
-      | `Error _ -> `Error "expected a positive integer"
-      | `Ok n as r -> if n <= 0
-        then `Error "expected a positive integer"
-        else r in
-    (parser, printer) in
-  mk_opt ["j";"jobs"] "JOBS"
-    "Set the maximal number of concurrent jobs to use when installing packages.
-     You can also set it using the $(b,\\$OPAMJOBS) environment variable.
-     This setting only applies when the $(i,-i) flag is also passed."
-    Arg.(some positive) None
-
-let verbose_arg = 
+let su_arg =
   Arg.(value & flag &
-       info ~doc:"Display the build output of source packages as they are
-     being compiled. You can set it using the $(b,\\$OPAMVERBOSE) environment
-     variable.  This setting only applies when the $(i,-i) flag is also passed."
-     ["v";"verbose"])
+       info ~doc:"Attempt 'su' rather than 'sudo' when requiring root rights"
+         ["su"])
 
-let yes_arg =
-  Arg.(value & flag &
-       info ~doc:"Disable interactive mode and answer yes to all questions that
-     would otherwise be asked to the user. This is equivalent to setting
-     \\$OPAMYES to \"true\".  This setting only applies when the $(i,-i) flag is
-     also passed." ["y";"yes"])
+let interactive_arg =
+  Arg.(value & vflag None [
+      Some true, info
+        ~doc:"Run the system package manager interactively (default if run \
+              from a tty)"
+        ["interactive";"I"];
+      Some false, info
+        ~doc:"Run the system package manager non-interactively \
+              (default when not running from a tty)"
+        ["noninteractive"];
+    ])
 
 let dryrun_arg =
   Arg.(value & flag &
@@ -468,6 +478,29 @@ let dryrun_arg =
                   1 otherwise."
          ["n";"dry-run"])
 
+let opam_args =
+  let docs = "OPAM OPTIONS" in
+  let flags =
+    List.map
+      (fun fs ->
+         let term = Arg.(value & flag_all & info ~docs fs) in
+         Term.(pure (List.map (fun _ -> "--"^List.hd fs))
+               $ term))
+      [ ["verbose";"v"];
+        ["yes";"y"] ]
+  in
+  let options =
+    List.map
+      (fun fs ->
+         let term = Arg.(value & opt_all string [] & info ~docs fs) in
+         Term.(pure (List.map (Printf.sprintf "--%s=%s" (List.hd fs)))
+               $ term))
+      [ ["jobs";"j"] ]
+  in
+  List.fold_left (fun acc t ->
+      Term.(pure (@) $ acc $ t))
+    Term.(pure []) (flags @ options)
+
 let command =
   let man = [
     `S "DESCRIPTION";
@@ -476,6 +509,9 @@ let command =
         perform OS and distribution detection, query OPAM for the right \
         external dependencies on a set of packages, and call the OS package \
         manager in the appropriate way to install then.";
+    `S "OPAM OPTIONS";
+    `P "These options are passed through to the child opam process when \
+        used in conjunction with the $(i,-i) flag.";
     `S "COPYRIGHT";
     `P "$(b,opam-depext) is written by Louis Gesbert <louis.gesbert@ocamlpro.com>, \
         copyright OCamlPro 2014-2015 with contributions from Anil Madhavapeddy, \
@@ -488,11 +524,21 @@ let command =
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
-        jobs_arg $ verbose_arg $ yes_arg $ packages_arg),
+        su_arg $ interactive_arg $ opam_args $
+        packages_arg),
   Term.info "opam-depext" ~version:"1.0.0" ~doc ~man
 
 let () =
-  match Term.eval command with
-  | `Ok () | `Version | `Help -> exit 0
-  | `Error (`Parse | `Term) -> exit 2
-  | `Error `Exn -> exit 1
+  Sys.catch_break true;
+  try
+    match Term.eval ~catch:false command with
+    | `Ok () | `Version | `Help -> exit 0
+    | `Error (`Parse | `Term) -> exit 2
+    | `Error `Exn -> exit 1
+  with
+  | Sys.Break ->
+    prerr_endline "Interrupted.";
+    exit 130
+  | Fatal_error m ->
+    prerr_endline m;
+    exit 1
