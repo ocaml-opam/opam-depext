@@ -1,4 +1,4 @@
-1.0.0 (2016-02-24):
+0.10.0 (2016-03-02):
 * Add support for `-y`, `-j <jobs>` and `-v` flags when used in
   conjunction with `opam depext -i`.  These are passed through to
   the `opam install` command and allow non-interactive, parallel and
@@ -7,6 +7,9 @@
   used by an equivalent `opam depext -i` call.
 * Fix the debug printing when using `opam depext -d` to flush output
   more often and add newlines.
+* Be nicer when run interactively with respect to the package manager
+  prompts. Fall back to `su` when `sudo` is unavailable.
+* Fix FreeBSD support (#38 via @hannesm).
 
 0.9.1 (2016-02-22):
 * Do not assume that `bash` is installed for source depexts (#35).
