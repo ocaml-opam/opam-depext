@@ -112,7 +112,7 @@ let distribution = function
               in (List.hd (string_split ' ' (List.hd (lines_of_file release_file))))
        in
        match String.lowercase name with
-       | "debian" -> Some `Debian
+       | "debian" | "raspbian" -> Some `Debian
        | "ubuntu" -> Some `Ubuntu
        | "centos" -> Some `Centos
        | "fedora" -> Some `Fedora
