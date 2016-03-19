@@ -157,7 +157,7 @@ let distrflags = function
   | Some `Centos -> ["centos"]
   | Some `Fedora -> ["fedora"]
   | Some `RHEL -> ["rhel"]
-  | Some `OracleLinux -> ["ol"]
+  | Some `OracleLinux -> ["oraclelinux"]
   | Some `Mageia -> ["mageia"]
   | Some `Alpine -> ["alpine"]
   | Some `Archlinux -> ["archlinux"]

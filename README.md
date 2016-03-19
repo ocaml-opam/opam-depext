@@ -14,7 +14,7 @@ Currently supported depexts are:
 * `centos` `linux`
 * `fedora` `linux`
 * `rhel` `linux`
-* `ol` `linux`
+* `oraclelinux` `linux`
 * `mageia` `linux`
 * `alpine` `linux`
 * `archlinux` `linux`
