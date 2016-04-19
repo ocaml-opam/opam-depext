@@ -242,6 +242,8 @@ let update_command = function
 
 exception Signaled_or_stopped of string list * Unix.process_status
 
+module StringMap = Map.Make(String)
+
 (* filter 'packages' to retain only the installed ones *)
 let get_installed_packages distribution (packages: string list): string list =
   match distribution with
@@ -250,6 +252,7 @@ let get_installed_packages distribution (packages: string list): string list =
     let installed = List.flatten (List.map (string_split ' ') lines) in
     List.filter (fun p -> List.mem p packages) installed
   | Some (`Debian | `Ubuntu) ->
+    (* First query regular package *)
     let cmd =
       (* ${db:Status-Status} would give only the column we're interested in, but
          it's quite new in dpkg-query. *)
@@ -258,11 +261,49 @@ let get_installed_packages distribution (packages: string list): string list =
          @ ["2>/dev/null"])
     in
     let lines = try lines_of_command cmd with _ -> [] in
+    let installed =
+      List.fold_left
+        (fun acc l -> match string_split ' ' l with
+           | [pkg;_;_;"installed"] -> pkg :: acc
+           | _ -> acc)
+        [] lines in
+    if List.length installed = List.length packages then installed else
+    (* If package are missing look for virtual package. *)
+    let missing =
+      (* quadratic should not be a problem... *)
+      List.filter (fun x -> not (List.mem x installed)) packages in
+    let resolve_virtual name =
+      let cmd =
+        Printf.sprintf "apt-cache --names-only search '^%s$' 2>/dev/null" name in
+      let lines = try lines_of_command cmd with _ -> [] in
+      List.fold_left
+        (fun acc l -> match string_split ' ' l with
+           | pkg :: _ -> pkg :: acc
+           | [] -> acc)
+        [] lines in
+    let virtual_map =
+      List.fold_left
+        (fun acc vpkg ->
+           List.fold_left
+             (fun acc pkg ->
+                let old = try StringMap.find pkg acc with Not_found -> [] in
+                StringMap.add pkg (vpkg :: old) acc)
+             acc (resolve_virtual vpkg))
+        StringMap.empty missing in
+    let real_packages = List.map fst (StringMap.bindings virtual_map) in
+    let cmd =
+      (* ${db:Status-Status} would give only the column we're interested in, but
+         it's quite new in dpkg-query. *)
+      String.concat " "
+        ("dpkg-query -W -f '${Package} ${Status}\\n'" :: real_packages
+         @ ["2>/dev/null"])
+    in
+    let lines = try lines_of_command cmd with _ -> [] in
     List.fold_left
       (fun acc l -> match string_split ' ' l with
-         | [pkg;_;_;"installed"] -> pkg :: acc
+         | [pkg;_;_;"installed"] -> StringMap.find pkg virtual_map @ acc
          | _ -> acc)
-      [] lines
+      installed lines
   | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Alpine | `RHEL | `OracleLinux) ->
     let query_command_prefix = match distribution with
       | Some (`Centos | `Fedora | `Mageia | `RHEL | `OracleLinux) -> ["rpm"; "-qi"]
