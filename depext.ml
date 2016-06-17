@@ -121,6 +121,7 @@ let distribution = function
        | "alpine" -> Some `Alpine
        | "arch" -> Some `Archlinux
        | "rhel" -> Some `RHEL
+       | "opensuse" -> Some `OpenSUSE
        | "ol" -> Some `OracleLinux
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
@@ -157,6 +158,7 @@ let distrflags = function
   | Some `Centos -> ["centos"]
   | Some `Fedora -> ["fedora"]
   | Some `RHEL -> ["rhel"]
+  | Some `OpenSUSE -> ["opensuse"]
   | Some `OracleLinux -> ["oraclelinux"]
   | Some `Mageia -> ["mageia"]
   | Some `Alpine -> ["alpine"]
@@ -220,6 +222,8 @@ let install_packages_commands ~interactive distribution packages =
     ["emerge"::packages]
   | Some `Alpine ->
     ["apk"::"add"::packages]
+  | Some `OpenSUSE ->
+    ["zypper"::"install"::packages]
   | Some (`Other d) ->
     fatal_error "Sorry, don't know how to install packages on your %s  system" d
   | None ->
@@ -238,6 +242,8 @@ let update_command = function
      ["emerge"; "-u"]
   | Some `Alpine ->
      ["apk"; "update"]
+  | Some `OpenSUSE ->
+     ["zypper"; "update"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
 exception Signaled_or_stopped of string list * Unix.process_status
@@ -249,6 +255,10 @@ let get_installed_packages distribution (packages: string list): string list =
   match distribution with
   | Some `Homebrew ->
     let lines = try lines_of_command "brew list" with _ -> [] in
+    let installed = List.flatten (List.map (string_split ' ') lines) in
+    List.filter (fun p -> List.mem p packages) installed
+  | Some `OpenSUSE ->
+    let lines = try lines_of_command "zypper --quiet se -i -t package|grep '^i '|awk -F'|' '{print $2}'|xargs echo" with _ -> [] in
     let installed = List.flatten (List.map (string_split ' ') lines) in
     List.filter (fun p -> List.mem p packages) installed
   | Some (`Debian | `Ubuntu) ->
