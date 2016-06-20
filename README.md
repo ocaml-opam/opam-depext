@@ -18,6 +18,7 @@ Currently supported depexts are:
 * `mageia` `linux`
 * `alpine` `linux`
 * `archlinux` `linux`
+* `opensuse` `linux`
 * `win32` `cygwin`
 * `gentoo`
 * `freebsd`
