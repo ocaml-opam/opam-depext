@@ -223,7 +223,7 @@ let install_packages_commands ~interactive distribution packages =
   | Some `Alpine ->
     ["apk"::"add"::packages]
   | Some `OpenSUSE ->
-    ["zypper"::"install"::packages]
+    ["zypper"::"install"::yes ["-y"] packages]
   | Some (`Other d) ->
     fatal_error "Sorry, don't know how to install packages on your %s  system" d
   | None ->
