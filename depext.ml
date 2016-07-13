@@ -456,7 +456,7 @@ let main print_flags list short no_sources
   let su = su_arg || not (has_command "sudo") in
   let interactive = match interactive_arg with
     | Some i -> i
-    | None -> Unix.isatty Unix.stdin
+    | None -> not (List.mem "--yes" opam_args) && Unix.isatty Unix.stdin
   in
   if os_packages <> [] && update_arg then
     update ~su ~interactive os distribution;
@@ -515,7 +515,7 @@ let interactive_arg =
   Arg.(value & vflag None [
       Some true, info
         ~doc:"Run the system package manager interactively (default if run \
-              from a tty)"
+              from a tty and $(i,--yes) was not also specified)"
         ["interactive";"I"];
       Some false, info
         ~doc:"Run the system package manager non-interactively \
@@ -564,7 +564,9 @@ let command =
         manager in the appropriate way to install then.";
     `S "OPAM OPTIONS";
     `P "These options are passed through to the child opam process when \
-        used in conjunction with the $(i,-i) flag.";
+        used in conjunction with the $(i,-i) flag. Additionally, $(i,--yes) \
+        implies $(i,--noninteractive) unless $(i,--interactive) was made \
+        explicit.";
     `S "COPYRIGHT";
     `P "$(b,opam-depext) is written by Louis Gesbert <louis.gesbert@ocamlpro.com>, \
         copyright OCamlPro 2014-2015 with contributions from Anil Madhavapeddy, \
