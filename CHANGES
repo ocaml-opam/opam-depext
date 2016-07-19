@@ -1,3 +1,7 @@
+1.0.1:
+* Add support for `OPAMYES` and `OPAMVERBOSE` environment variables
+  to force `-y` and `-v` respectively.
+
 1.0.0 (2016-06-19):
 * Add support for `-y`, `-j <jobs>` and `-v` flags when used in
   conjunction with `opam depext -i`.  These are passed through to

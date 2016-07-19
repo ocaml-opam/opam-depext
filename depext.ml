@@ -535,12 +535,12 @@ let opam_args =
   let docs = "OPAM OPTIONS" in
   let flags =
     List.map
-      (fun fs ->
-         let term = Arg.(value & flag_all & info ~docs fs) in
+      (fun (fs,env) ->
+         let term = Arg.(value & flag_all & info ?env ~docs fs) in
          Term.(pure (List.map (fun _ -> "--"^List.hd fs))
                $ term))
-      [ ["verbose";"v"];
-        ["yes";"y"] ]
+      [ ["verbose";"v"], (Some (Arg.env_var "OPAMVERBOSE" ~doc:"Force a verbose session"));
+        ["yes";"y"], (Some (Arg.env_var "OPAMYES" ~doc:"Force a non-interactive session")) ]
   in
   let options =
     List.map
@@ -581,7 +581,7 @@ let command =
         no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
         su_arg $ interactive_arg $ opam_args $
         packages_arg),
-  Term.info "opam-depext" ~version:"1.0.0" ~doc ~man
+  Term.info "opam-depext" ~version:"1.0.1" ~doc ~man
 
 let () =
   Sys.catch_break true;
