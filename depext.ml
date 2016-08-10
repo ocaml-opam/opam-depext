@@ -311,7 +311,7 @@ let get_installed_packages distribution (packages: string list): string list =
     let lines = try lines_of_command cmd with _ -> [] in
     List.fold_left
       (fun acc l -> match string_split ' ' l with
-         | [pkg;_;_;"installed"] -> StringMap.find pkg virtual_map @ acc
+         | [pkg;_;_;"installed"] -> (try StringMap.find pkg virtual_map @ acc with Not_found -> acc)
          | _ -> acc)
       installed lines
   | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Alpine | `RHEL | `OracleLinux) ->
