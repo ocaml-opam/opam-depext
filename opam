@@ -1,6 +1,6 @@
 opam-version: "1.2"
 name: "depext"
-version: "1.0.1"
+version: "1.0.2"
 maintainer: ["Louis Gesbert <louis.gesbert@ocamlpro.com>"
              "Anil Madhavapeddy <anil@recoil.org>" ]
 authors: ["Louis Gesbert <louis.gesbert@ocamlpro.com>"
