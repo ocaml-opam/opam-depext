@@ -1,17 +1,19 @@
-PREFIX=$(shell opam config var prefix)
 
-all: opam-depext
+all: shell/build.sh
+	cd src_ext && $(MAKE)
+	sh -ex shell/build.sh
 
-ALWAYS:
-
-opam-depext: _build/depext.native ALWAYS
-	cp $< $@
-
-_build/%: ALWAYS
-	ocamlbuild -tags annot,bin_annot,debug,use_unix -pkg cmdliner $*
+shell/build.sh: shell/build.ml
+	ocaml $< byte > $@
+	chmod a+x $@
 
 clean:
-	rm -rf _build opam-depext depext.native
+	rm -f opam-depext shell/build.sh *.cmi *.cma *.cmo *.cmx
+	cd src_ext && $(MAKE) clean
+
+distclean:
+	cd src_ext && $(MAKE) distclean
 
 install:
 	opam-installer --prefix=$(PREFIX)
+
