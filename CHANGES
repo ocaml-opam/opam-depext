@@ -1,3 +1,8 @@
+1.0.3 (2017-03-08):
+* Vendor in cmdliner to remove the dependency on all external
+  OCaml packages.  This lets depext always be the first in the
+  dependency order, including not needing ocamlfind or ocamlbuild.
+
 1.0.2 (2016-08-11):
 * Fix uncaught exception on empty depexts
 
