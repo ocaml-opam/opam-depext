@@ -1,4 +1,3 @@
-
 all: shell/build.sh
 	cd src_ext && $(MAKE)
 	sh -ex shell/build.sh
@@ -17,3 +16,5 @@ distclean:
 install:
 	opam-installer --prefix=$(PREFIX)
 
+distrib:
+	cd src_ext && $(MAKE) archives
