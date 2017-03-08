@@ -7,7 +7,7 @@ script: bash ./.travis-docker.sh
 env:
  global:
    - PACKAGE="depextx"
-   - POST_INSTALL_HOOK="opam install -y ocamlfind && opam config exec make && /repo/opam-depext --version && /repo/opam-depext -ui ssl && /repo/opam-depext -ui -j 2 -y -v pcre"
+   - POST_INSTALL_HOOK="/repo/opam-depext --version && /repo/opam-depext -ui ssl && /repo/opam-depext -ui -j 2 -y -v pcre"
  matrix:
    - DISTRO=debian-stable OCAML_VERSION=4.00.1
    - DISTRO=debian-testing OCAML_VERSION=4.01.0
@@ -18,3 +18,4 @@ env:
    - DISTRO=centos-7 OCAML_VERSION=4.04.0
    - DISTRO=fedora-24 OCAML_VERSION=4.04.0
    - DISTRO=alpine OCAML_VERSION=4.05.0
+   - DISTRO=opensuse-42.2 OCAML_VERSION=4.04.0
