@@ -382,17 +382,28 @@ let install ~su ~interactive os distribution = function
     if ok then Printf.printf "# OS packages installation successful\n%!"
     else fatal_error "OS package installation failed"
 
+let file_protocol = "file://"
+let file_protocol_len = String.length file_protocol
+let is_file_protocol url =
+  String.sub url 0 file_protocol_len = file_protocol
+let file_from_url url =
+  String.sub url file_protocol_len (String.length url - file_protocol_len)
+
 let run_source_scripts = function
   | [] -> ()
   | source_urls ->
     let commands =
       (* OPAM supports (and requires) either, by doing it too we ensure that we
          don't need extra depexts *)
-      if has_command "curl" then
-        (* This still feels a bit frightening, said this way. *)
-        List.map (Printf.sprintf "curl -L \"%s\" | sh -ex -") source_urls
-      else
-        List.map (Printf.sprintf "wget -O - \"%s\" | sh -ex -") source_urls
+      let dl_cmd = if has_command "curl" then "curl -L" else "wget -O -" in
+      (* This still feels a bit frightening, said this way. *)
+      let url_to_cmd url =
+        if String.length url >= file_protocol_len && is_file_protocol url then
+          Printf.sprintf "sh -ex \"%s\"" (file_from_url url)
+        else
+          Printf.sprintf "%s \"%s\" | sh -ex -" dl_cmd url
+      in
+      List.map url_to_cmd source_urls
     in
     List.iter (fun cmd ->
         match run_command [cmd] with
