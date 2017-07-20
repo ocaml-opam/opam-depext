@@ -7,24 +7,26 @@ in their definitions).
 
 Currently supported depexts are:
 
-* `homebrew` `osx`
-* `macports` `osx`
-* `debian` `linux`
-* `ubuntu` `linux`
-* `centos` `linux`
-* `fedora` `linux`
-* `rhel` `linux`
-* `oraclelinux` `linux`
-* `mageia` `linux`
-* `alpine` `linux`
-* `archlinux` `linux`
-* `opensuse` `linux`
-* `win32` `cygwin`
-* `gentoo`
-* `freebsd`
-* `openbsd`
-* `netbsd`
-* `dragonfly`
+| Depext                 | Online package list                                     |
+|------------------------|---------------------------------------------------------|
+| `alpine` `linux`       | https://pkgs.alpinelinux.org                            |
+| `archlinux` `linux`    | https://www.archlinux.org/packages/                     |
+| `centos` `linux`       | http://centos-packages.com/                             |
+| `debian` `linux`       | https://www.debian.org/distrib/packages#search_packages |
+| `dragonfly`            |                                                         |
+| `fedora` `linux`       | https://apps.fedoraproject.org/packages/                |
+| `freebsd`              | https://www.freebsd.org/ports/index.html                |
+| `gentoo`               | https://packages.gentoo.org/                            |
+| `homebrew` `osx`       | http://braumeister.org/                                 |
+| `macports` `osx`       | https://www.macports.org/ports.php                      |
+| `mageia` `linux`       |                                                         |
+| `netbsd`               | http://pkgsrc.se/                                       |
+| `openbsd`              | http://openports.se/                                    |
+| `opensuse` `linux`     | https://software.opensuse.org/find                      |
+| `oraclelinux` `linux`  |                                                         |
+| `rhel` `linux`         |                                                         |
+| `ubuntu` `linux`       | https://packages.ubuntu.com/                            |
+| `win32` `cygwin`       |                                                         |
  
 This version runs as an OPAM plugin; it may help pave the way to some
 specification of the `depexts` field and give some basis for a real

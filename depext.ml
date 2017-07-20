@@ -243,7 +243,7 @@ let update_command = function
   | Some `Alpine ->
      ["apk"; "update"]
   | Some `OpenSUSE ->
-     ["zypper"; "update"]
+     ["zypper"; "--non-interactive"; "update"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
 exception Signaled_or_stopped of string list * Unix.process_status
