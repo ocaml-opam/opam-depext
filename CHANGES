@@ -1,3 +1,8 @@
+1.0.5 (2017-07-20):
+* Pass `--non-interactive` to zypper on OpenSUSE (#67 #62 by
+  @yallop and @jpdeplaix)
+* Improve README to point to package descriptions (#65 by @dbuenzli)
+
 1.0.4 (2017-03-30):
 * Fix build on FreeBSD (#61 by @sg2342)
 
