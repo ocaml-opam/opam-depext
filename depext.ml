@@ -190,7 +190,7 @@ let depexts flags opam_packages =
     else
     (* this is lighter, more general and doesn't require a lock. But only on
        newer opams *)
-    Printf.sprintf "opam list --safe --recursive --external=%s --required-by=%s"
+    Printf.sprintf "opam list --safe --recursive --external=%s --required-by=%s --installable"
       (String.concat "," flags)
       (String.concat "," opam_packages)
   in
