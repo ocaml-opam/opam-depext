@@ -363,7 +363,7 @@ let update ~su ~interactive os distribution =
   let cmd = update_command distribution in
   match sudo_run_command ~su ~interactive os distribution cmd with
   | Unix.WEXITED 0 ->
-    Printf.printf "# OS package update successful\n%!"
+    Printf.eprintf "# OS package update successful\n%!"
   | _ -> fatal_error "OS package update failed"
 
 let install ~su ~interactive os distribution = function
@@ -379,7 +379,7 @@ let install ~su ~interactive os distribution = function
           is_success (sudo_run_command ~su ~interactive os distribution cmd))
         true cmds
     in
-    if ok then Printf.printf "# OS packages installation successful\n%!"
+    if ok then Printf.eprintf "# OS packages installation successful\n%!"
     else fatal_error "OS package installation failed"
 
 let run_source_scripts = function
@@ -399,7 +399,7 @@ let run_source_scripts = function
         | Unix.WEXITED 0 -> ()
         | _ -> fatal_error "Command %S failed" cmd)
       commands;
-    Printf.printf "Source installation scripts run successfully\n%!"
+    Printf.eprintf "Source installation scripts run successfully\n%!"
 
 
 (* Command-line handling *)
@@ -414,18 +414,20 @@ let main print_flags list short no_sources
   let flags = archflags arch @ osflags os @ distrflags distribution in
   if print_flags then
     (if short then List.iter print_endline flags else
-       Printf.printf "# Depexts flags detected on this system: %s\n"
+       Printf.eprintf "# Depexts flags detected on this system: %s\n"
          (String.concat " " flags);
      exit 0);
   if not short then
-    Printf.printf "# Detecting depexts using flags: %s\n%!"
+    Printf.eprintf "# Detecting depexts using flags: %s\n%!"
       (String.concat " " flags);
   let os_packages = depexts flags opam_packages in
   if os_packages <> [] && not short then
-    Printf.printf "# The following system packages are needed:\n#  - %s\n%!"
-      (String.concat "\n#  - " os_packages)
+    begin
+      prerr_endline "# The following system packages are needed:";
+      Printf.printf "%s\n%!" (String.concat "\n" os_packages)
+    end
   else if list && not short then
-    print_endline "# No required system packages found";
+    prerr_endline "# No required system packages found";
   if list then exit 0;
   let source_urls =
     if no_sources then [] else
@@ -433,10 +435,10 @@ let main print_flags list short no_sources
         (depexts (sourceflags @ flags) opam_packages)
   in
   if source_urls <> [] && not short then
-    Printf.printf "# The following scripts need to be run:\n#  - %s\n%!"
+    Printf.eprintf "# The following scripts need to be run:\n#  - %s\n%!"
       (String.concat "\n#  - " source_urls);
   if os_packages = [] && source_urls = [] && not short then
-    Printf.printf "# No extra OS packages requirements found.\n%!";
+    Printf.eprintf "# No extra OS packages requirements found.\n%!";
   let installed = get_installed_packages distribution os_packages in
   let os_packages =
     List.filter (fun p -> not (List.mem p installed)) os_packages
@@ -446,11 +448,11 @@ let main print_flags list short no_sources
      List.iter print_endline source_urls)
   else if installed <> [] then
     if os_packages <> [] then
-      Printf.printf
+      Printf.eprintf
         "# The following new OS packages need to be installed: %s\n%!"
         (String.concat " " os_packages)
     else
-      Printf.printf
+      Printf.eprintf
         "# All required OS packages found.\n%!";
   if dryrun_arg then exit (if os_packages = [] then 0 else 1);
   let su = su_arg || not (has_command "sudo") in
@@ -464,7 +466,7 @@ let main print_flags list short no_sources
   run_source_scripts source_urls;
   let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
   if install_arg && opam_packages <> [] then begin
-    (if not short then Printf.printf "# Now letting OPAM install the packages\n%!");
+    (if not short then Printf.eprintf "# Now letting OPAM install the packages\n%!");
     (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
     Unix.execvp "opam" (Array.of_list opam_cmdline)
   end
