@@ -210,7 +210,16 @@ let install_packages_commands ~interactive distribution packages =
   | Some (`Debian | `Ubuntu) ->
     ["apt-get"::"install"::yes ["-qq"; "-yy"] packages]
   | Some (`Centos | `Fedora | `Mageia | `RHEL | `OracleLinux) ->
-    ["yum"::"install"::yes ["-y"] packages;
+    (* When opem-packages specify the epel-release package, usually it
+       means that other dependencies require the EPEL repository to be
+       already setup when yum-install is called. Cf. #70, #76. *)
+    let epel_release = "epel-release" in
+    let install_epel =
+      try [
+        "yum"::"install"::yes ["-y"] [List.find ((=) epel_release) packages];
+      ] with _ -> [] in
+    install_epel @
+    ["yum"::"install"::yes ["-y"] (List.filter ((<>) epel_release) packages);
      "rpm"::"-q"::packages]
   | Some `FreeBSD ->
     ["pkg"::"install"::packages]
