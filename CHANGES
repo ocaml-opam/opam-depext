@@ -1,3 +1,7 @@
+1.0.6 (2017-07-24):
+* Really fix Zypper non-interactive installation by passing
+  parameters in the right order (#68 by @jpdeplaix).
+
 1.0.5 (2017-07-20):
 * Pass `--non-interactive` to zypper on OpenSUSE (#67 #62 by
   @yallop and @jpdeplaix)
