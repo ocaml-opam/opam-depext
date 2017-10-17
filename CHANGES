@@ -1,3 +1,7 @@
+1.1.0 (2017-10-17):
+* Separate output between comments (stderr) and information (stdout)
+* Switch to opam 2.0.0~beta5 CLI and variables (not backwards compatible)
+
 1.0.6 (2017-07-24):
 * Really fix Zypper non-interactive installation by passing
   parameters in the right order (#68 by @jpdeplaix).
