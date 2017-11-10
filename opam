@@ -10,5 +10,5 @@ license: "LGPL-3.0 with OCaml linking exception"
 dev-repo: "https://github.com/ocaml/opam-depext.git"
 build: [ make ]
 depends: [ ]
-available: [ opam-version >= "1.1.0" ]
+available: [ opam-version >= "2.0.0~beta5" ]
 tags: "flags:plugin"
