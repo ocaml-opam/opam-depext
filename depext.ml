@@ -119,11 +119,10 @@ let depexts opam_packages =
     fatal_error
       "This version of opam-depext requires opam 2.0.0~beta5 or higher";
   let c =
-    Printf.sprintf "opam list --safe --recursive --external --vars=%s%s"
-      (String.concat "," (List.map (fun (v, s) -> v^"="^s) opam_vars))
+    Printf.sprintf "opam list --readonly --external %s"
       (match opam_packages with
        | [] -> ""
-       | ps -> " --required-by=" ^ String.concat "," ps)
+       | ps -> " --resolve=" ^ String.concat "," ps)
   in
   let s = lines_of_command c in
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
