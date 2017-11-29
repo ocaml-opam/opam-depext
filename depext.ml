@@ -84,108 +84,13 @@ let has_prefix s pfx =
     true
   with Exit -> false
 
-let arch =
-  let raw = match Sys.os_type with
-    | "Unix" | "Cygwin" -> command_output "uname -m"
-    | "Win32" ->
-      (match Sys.getenv "PROCESSOR_ARCHITECTURE" with
-       | "X86" as a ->
-         (try Sys.getenv "PROCESSOR_ARCHITEW6432" with Not_found -> a)
-       | arch -> arch)
-    | _ -> failwith "Bad Sys.os_type"
-  in
-  match String.lowercase raw with
-  | "x86" | "i386" | "i586" | "i686" -> "x86_32"
-  | "x86_64" | "amd64" -> "x86_64"
-  | "powerpc" | "ppc" | "ppcle" -> "ppc32"
-  | "ppc64" | "ppc64le" -> "ppc64"
-  | "aarch64_be" | "aarch64" | "armv8b" | "armv8l" -> "arm64"
-  | a when List.exists (has_prefix a)
-        ["armv5"; "armv6"; "earmv6"; "armv7"; "earmv7"] -> "arm32"
-  | "" -> "unknown"
-  | s -> s
+let opam_query var = command_output (Printf.sprintf "opam var %s --readonly" var)
 
-let os =
-  match Sys.os_type with
-  | "Unix" -> (match String.lowercase (command_output "uname -s") with
-      | "darwin" -> "macos"
-      | "" -> "unknown"
-      | s -> s)
-  | s -> String.lowercase s
-
-let os_release_field: string -> string =
-  let os_release_file = lazy (
-    List.find Sys.file_exists ["/etc/os-release"; "/usr/lib/os-release"] |>
-    lines_of_file |>
-    List.map (fun s -> Scanf.sscanf s "%s@= %s" (fun x v ->
-        x,
-        try Scanf.sscanf v "\"%s@\"" (fun s -> s)
-        with Scanf.Scan_failure _ -> v))
-  ) in
-  fun f ->
-    List.assoc f (Lazy.force os_release_file)
-
-let is_android, android_release =
-  let prop = lazy (
-    command_output "getprop ro.build.version.release 2>/dev/null"
-  ) in
-  (fun () -> try ignore (Lazy.force prop); true with Failure _ -> false),
-  (fun () -> Lazy.force prop)
-
-let distribution =
-  match os with
-  | "macos" ->
-    if has_command "brew" then "homebrew"
-    else if has_command "port" then "macports"
-    else os
-  | "linux" ->
-    (String.lowercase @@
-     if is_android () then "android" else
-     try os_release_field "ID" with Not_found ->
-     try command_output "lsb_release -i -s 2>/dev/null" with Failure _ ->
-     try
-       List.find Sys.file_exists ["/etc/redhat-release";
-                                  "/etc/centos-release";
-                                  "/etc/gentoo-release";
-                                  "/etc/issue"] |>
-       fun s -> Scanf.sscanf s " %s " (fun s -> s)
-     with Not_found -> os)
-  | _ -> os
-
-let os_version =
-  match os with
-  | "linux" ->
-    (String.lowercase @@
-     try android_release () with Failure _ ->
-     try command_output "lsb_release -s -r" with Failure _ ->
-     try os_release_field "VERSION_ID" with Not_found ->
-       "unknown")
-  | "macos" ->
-    (String.lowercase @@
-     try command_output "sw_vers -productVersion" with Failure _ ->
-       "unknown")
-  | "win32" | "cygwin" ->
-    (try
-       let s = command_output "cmd /C ver" in
-       Scanf.sscanf s "%_s@[ Version %s@]" String.lowercase
-     with Failure _ | Scanf.Scan_failure _ -> "unknown")
-  | "freebsd" ->
-    (String.lowercase @@
-     try command_output "uname -U" with Failure _ -> "unknown")
-  | _ ->
-    (String.lowercase @@
-     try command_output "uname -r" with Failure _ -> "unknown")
-
-let family =
-  match os with
-  | "linux" ->
-    (try
-       Scanf.sscanf (os_release_field "ID_LIKE")
-         "%s" String.lowercase (* first word *)
-     with Not_found -> distribution)
-  | "freebsd" | "openbsd" | "netbsd" | "dragonfly" -> "bsd"
-  | "win32" | "cygwin" -> "windows"
-  | _ -> os
+let arch = opam_query "arch"
+let os = opam_query "os"
+let distribution = opam_query "os-distribution"
+let os_version = opam_query "os-version"
+let family = opam_query "os-family"
 
 let opam_vars = [
   "arch", arch;
@@ -375,7 +280,7 @@ let sudo_run_command ~su ~interactive cmd =
   let cmd =
     match os, distribution with
     | ("linux" | "unix" | "freebsd" | "openbsd" | "netbsd" | "dragonfly"), _
-    | "darwin", "macports" ->
+    | "macos", "macports" ->
       (* not sure about this list *)
       if Unix.getuid () <> 0 then (
         Printf.printf
@@ -481,7 +386,7 @@ let packages_arg =
 
 let print_flags_arg =
   Arg.(value & flag &
-       info ~doc:"Only display the inferred \"depexts\" flags" ["flags"])
+       info ~doc:"Only display the inferred \"depexts\" variables" ["flags"])
 
 let list_arg =
   Arg.(value & flag &
