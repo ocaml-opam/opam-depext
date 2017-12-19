@@ -11,6 +11,11 @@ let lines_of_channel ic =
   in
   List.rev (aux [])
 
+exception Fatal_error of string * int
+
+let fatal_error ?(exit_code=1) fmt =
+  Printf.ksprintf (fun s -> raise (Fatal_error (s, exit_code))) fmt
+
 let lines_of_command c =
   if !debug then Printf.eprintf "+ %s\n%!" c;
   let ic = Unix.open_process_in c in
@@ -18,13 +23,13 @@ let lines_of_command c =
   match Unix.close_process_in ic with
   | Unix.WEXITED 0 -> lines
   | Unix.WEXITED 127 ->
-    Printf.ksprintf failwith "Command not found: %s" c
+    fatal_error "Command not found: %s" c
   | Unix.WEXITED i ->
-    Printf.ksprintf failwith "Command failed: %s returned %d" c i
+    fatal_error ~exit_code:i "Command failed: %s returned %d" c i
   | Unix.WSIGNALED i ->
-    Printf.ksprintf failwith "Command failed: %s signal %d" c i
+    fatal_error "Command failed: %s signal %d" c i
   | Unix.WSTOPPED i ->
-    Printf.ksprintf failwith "Command failed: %s stopped %d" c i
+    fatal_error "Command failed: %s stopped %d" c i
 
 let lines_of_file f =
   let ic = open_in f in
@@ -32,15 +37,10 @@ let lines_of_file f =
   close_in ic;
   lines
 
-exception Fatal_error of string
-
-let fatal_error fmt =
-  Printf.ksprintf (fun s -> raise (Fatal_error s)) fmt
-
 let command_output c =
   match List.filter (fun s -> String.trim s <> "") (lines_of_command c) with
   | [s] -> s
-  | _ -> Printf.ksprintf failwith "Output of command too long: %S" c
+  | _ -> fatal_error "Output of command too long: %S" c
 
 let string_split char str =
   let rec aux pos =
@@ -496,6 +496,6 @@ let () =
   | Sys.Break ->
     prerr_endline "Interrupted.";
     exit 130
-  | Fatal_error m ->
+  | Fatal_error (m, exit_code) ->
     prerr_endline m;
-    exit 1
+    exit exit_code
