@@ -89,14 +89,12 @@ let opam_query var = command_output (Printf.sprintf "opam var %s --readonly" var
 let arch = opam_query "arch"
 let os = opam_query "os"
 let distribution = opam_query "os-distribution"
-let os_version = opam_query "os-version"
 let family = opam_query "os-family"
 
 let opam_vars = [
   "arch", arch;
   "os", os;
   "os-distribution", distribution;
-  "os-version", os_version;
   "os-family", family;
 ]
 
