@@ -219,8 +219,7 @@ let install_packages_commands ~interactive distribution packages =
         "yum"::"install"::yes ["-y"] [List.find ((=) epel_release) packages];
       ] with Not_found -> [] in
     install_epel @
-    ["yum"::"install"::yes ["-y"] (List.filter ((<>) epel_release) packages);
-     "rpm"::"-q"::packages]
+    ["yum"::"install"::yes ["-y"] (List.filter ((<>) epel_release) packages)]
   | Some `FreeBSD ->
     ["pkg"::"install"::packages]
   | Some (`OpenBSD | `NetBSD) ->
