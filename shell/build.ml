@@ -72,10 +72,10 @@ end = struct
 end
 
 let build_bytecode () =
-  print_endline "ocamlc -I src_ext/lib unix.cma cmdliner.cma -o opam-depext depext.ml"
+  print_endline "ocamlc -I src_ext/lib unix.cma cmdliner.cma -o opam-depext opamVersionCompare.ml depext.ml"
 
 let build_native () =
-  print_endline "ocamlopt -I src_ext unix.cmxa cmdliner.cmxa -o opam-depext depext.ml"
+  print_endline "ocamlopt -I src_ext unix.cmxa cmdliner.cmxa -o opam-depext opamVersionCompare.ml depext.ml"
 
 let usage () =
   Printf.eprintf "Usage: ocaml build.ml [byte|native]\n\nDefaults to 'native' build.\n%!";
