@@ -106,16 +106,11 @@ let opam_version = lazy (
 
 let depexts opam_packages =
   let opam_version = Lazy.force opam_version in
-  let recent_enough_opam =
-    try Scanf.sscanf opam_version "%d.%d.%d~beta%d"
-          (fun a b c d -> a = 2 && (b > 0 || c > 0 || d >= 5) || a > 2)
-    with Scanf.Scan_failure _ ->
-      Scanf.sscanf opam_version "%d.%d.%d%s"
-        (fun a b c s -> a = 2 && (b > 0 || c > 0 || s = "") || a > 2)
-  in
-  if not recent_enough_opam then
+  let min_version = "2.0.0~beta5" in
+  if OpamVersionCompare.compare opam_version min_version < 0 then
     fatal_error
-      "This version of opam-depext requires opam 2.0.0~beta5 or higher";
+      "This version of opam-depext requires opam %s or higher"
+      min_version;
   let c =
     Printf.sprintf "opam list --readonly --external %s"
       (match opam_packages with
