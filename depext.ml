@@ -107,11 +107,9 @@ let opam_version = lazy (
 let depexts opam_packages =
   let opam_version = Lazy.force opam_version in
   let recent_enough_opam =
-    try Scanf.sscanf opam_version "%d.%d.%d~beta%d"
-          (fun a b c d -> a = 2 && (b > 0 || c > 0 || d >= 5) || a > 2)
-    with Scanf.Scan_failure _ ->
-      Scanf.sscanf opam_version "%d.%d.%d%s"
-        (fun a b c s -> a = 2 && (b > 0 || c > 0 || s = "") || a > 2)
+    let newer_beta5 s = s = "" || s.[0] <> '~' || s >= "~beta5" in
+    Scanf.sscanf opam_version "%d.%d.%d%s"
+      (fun a b c s -> a = 2 && (b > 0 || c > 0 || newer_beta5 s) || a > 2)
   in
   if not recent_enough_opam then
     fatal_error
