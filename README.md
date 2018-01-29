@@ -19,7 +19,7 @@ Currently supported depexts are:
 | `gentoo`               | https://packages.gentoo.org/                            |
 | `homebrew` `osx`       | http://braumeister.org/                                 |
 | `macports` `osx`       | https://www.macports.org/ports.php                      |
-| `mageia` `linux`       |                                                         |
+| `mageia` `linux`       | https://madb.mageia.org/                                |
 | `netbsd`               | http://pkgsrc.se/                                       |
 | `openbsd`              | http://openports.se/                                    |
 | `opensuse` `linux`     | https://software.opensuse.org/find                      |
