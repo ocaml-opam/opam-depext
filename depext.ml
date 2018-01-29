@@ -479,7 +479,7 @@ let command =
         debug_arg $ install_arg $ update_arg $ dryrun_arg $
         su_arg $ interactive_arg $ opam_args $
         packages_arg),
-  Term.info "opam-depext" ~version:"1.1.0" ~doc ~man
+  Term.info "opam-depext" ~version:"1.1.1" ~doc ~man
 
 let () =
   Sys.catch_break true;

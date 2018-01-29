@@ -1,3 +1,7 @@
+1.1.1 (2018-01-29):
+* Propagate exit codes of sub-commands
+* Fixes
+
 1.1.0 (2017-10-17):
 * Separate output between comments (stderr) and information (stdout)
 * Switch to opam 2.0.0~beta5 CLI and variables (not backwards compatible)
