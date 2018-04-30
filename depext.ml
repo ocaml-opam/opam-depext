@@ -157,7 +157,7 @@ let install_packages_commands ~interactive packages =
     ["emerge"::packages]
   | "alpine" ->
     ["apk"::"add"::packages]
-  | "opensuse" ->
+  | "suse" | "opensuse" ->
     ["zypper"::yes ["--non-interactive"] ("install"::packages)]
   | s ->
     fatal_error "Sorry, don't know how to install packages on your %s system" s
@@ -175,7 +175,7 @@ let update_command = match family with
      ["emerge"; "-u"]
   | "alpine" ->
      ["apk"; "update"]
-  | "opensuse" ->
+  | "suse" | "opensuse" ->
      ["zypper"; "--non-interactive"; "update"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
@@ -190,7 +190,7 @@ let get_installed_packages (packages: string list): string list =
     let lines = try lines_of_command "brew list" with _ -> [] in
     let installed = List.flatten (List.map (string_split ' ') lines) in
     List.filter (fun p -> List.mem p packages) installed
-  | "opensuse" ->
+  | "suse" | "opensuse" ->
     let lines = try lines_of_command "zypper --quiet se -i -t package|grep '^i '|awk -F'|' '{print $2}'|xargs echo" with _ -> [] in
     let installed = List.flatten (List.map (string_split ' ') lines) in
     List.filter (fun p -> List.mem p packages) installed
