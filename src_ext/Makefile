@@ -1,4 +1,4 @@
-SHELL=bash
+SHELL=sh
 FETCH=curl -OL
 OCAML=ocaml
 OCAMLC=ocamlc

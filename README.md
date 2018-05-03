@@ -11,7 +11,7 @@ Currently supported depexts are:
 |------------------------|---------------------------------------------------------|
 | `alpine` `linux`       | https://pkgs.alpinelinux.org                            |
 | `archlinux` `linux`    | https://www.archlinux.org/packages/                     |
-| `centos` `linux`       | http://centos-packages.com/                             |
+| `centos` `linux`       | https://pkgs.org/                                       |
 | `debian` `linux`       | https://www.debian.org/distrib/packages#search_packages |
 | `dragonfly`            |                                                         |
 | `fedora` `linux`       | https://apps.fedoraproject.org/packages/                |
@@ -19,10 +19,10 @@ Currently supported depexts are:
 | `gentoo`               | https://packages.gentoo.org/                            |
 | `homebrew` `osx`       | http://braumeister.org/                                 |
 | `macports` `osx`       | https://www.macports.org/ports.php                      |
-| `mageia` `linux`       | https://madb.mageia.org/                                |
+| `mageia` `linux`       | https://pkgs.org/                                       |
 | `netbsd`               | http://pkgsrc.se/                                       |
 | `openbsd`              | http://openports.se/                                    |
-| `opensuse` `linux`     | https://software.opensuse.org/find                      |
+| `opensuse` `linux`     | https://pkgs.org/                                       |
 | `oraclelinux` `linux`  |                                                         |
 | `rhel` `linux`         |                                                         |
 | `ubuntu` `linux`       | https://packages.ubuntu.com/                            |

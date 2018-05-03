@@ -147,7 +147,7 @@ let install_packages_commands ~interactive packages =
       ] with _ -> [] in
     install_epel @
     ["yum"::"install"::yes ["-y"] (List.filter ((<>) epel_release) packages);
-     "rpm"::"-q"::packages]
+     "rpm"::"-q"::"--whatprovides"::packages]
   | "bsd" ->
     if distribution = "freebsd" then ["pkg"::"install"::packages]
     else ["pkg_add"::packages]
@@ -263,18 +263,31 @@ let get_installed_packages (packages: string list): string list =
          | Unix.WEXITED 1 -> false (* not installed *)
          | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
       ) packages
-  | "bsd" when distribution = "freebsd" ->
-    let installed = try lines_of_command "pkg query %n" with _ -> [] in
-    List.filter (fun p -> List.mem p packages) installed
-  (* todo *)
+  | "bsd" ->
+    (match distribution with
+     | "freebsd" ->
+       let installed = try lines_of_command "pkg query %n" with _ -> [] in
+       List.filter (fun p -> List.mem p packages) installed
+     | "openbsd" ->
+       let installed = try lines_of_command "pkg_info -mqP" with _ -> [] in
+       List.filter (fun p -> List.mem p packages) installed
+     | _ -> [])
   | "macports" -> []
-  | "openbsd" | "netbsd" -> []
   | _ -> []
 
 let sudo_run_command ~su ~interactive cmd =
   let cmd =
     match os, distribution with
-    | ("linux" | "unix" | "freebsd" | "openbsd" | "netbsd" | "dragonfly"), _
+    | "openbsd", _ ->
+      if Unix.getuid () <> 0 then (
+        Printf.printf
+          "The following command needs to be run through %S:\n    %s\n%!"
+          "doas" (String.concat " " cmd);
+        if interactive && not (ask ~default:true "Allow ?") then
+          exit 1;
+        "doas"::cmd
+      ) else cmd
+    | ("linux" | "unix" | "freebsd" | "netbsd" | "dragonfly"), _
     | "macos", "macports" ->
       (* not sure about this list *)
       if Unix.getuid () <> 0 then (
@@ -361,7 +374,7 @@ let main print_flags list short
     | Some i -> i
     | None -> not (List.mem "--yes" opam_args) && Unix.isatty Unix.stdin
   in
-  if os_packages <> [] && update_arg then
+  if (os_packages <> [] || opam_packages = []) && update_arg then
     update ~su ~interactive;
   install ~su ~interactive os_packages;
   let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
