@@ -469,7 +469,7 @@ let main print_flags list short no_sources
     | Some i -> i
     | None -> not (List.mem "--yes" opam_args) && Unix.isatty Unix.stdin
   in
-  if os_packages <> [] && update_arg then
+  if (os_packages <> [] || opam_packages = []) && update_arg then
     update ~su ~interactive os distribution;
   install ~su ~interactive os distribution os_packages;
   run_source_scripts source_urls;
