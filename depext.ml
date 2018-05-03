@@ -342,15 +342,27 @@ let get_installed_packages distribution (packages: string list): string list =
   | Some `FreeBSD ->
     let installed = try lines_of_command "pkg query %n" with _ -> [] in
     List.filter (fun p -> List.mem p packages) installed
+  | Some (`OpenBSD) ->
+    let installed = try lines_of_command "pkg_info -mqP" with _ -> [] in
+    List.filter (fun p -> List.mem p packages) installed
   (* todo *)
   | Some `Macports -> []
-  | Some (`OpenBSD | `NetBSD) -> []
+  | Some (`NetBSD) -> []
   | Some (`Other _) | None -> []
 
 let sudo_run_command ~su ~interactive os distribution cmd =
   let cmd =
     match os, distribution with
-    | (`Linux | `Unix | `FreeBSD | `OpenBSD | `NetBSD | `Dragonfly), _
+    | `OpenBSD, _ ->
+      if Unix.getuid () <> 0 then (
+        Printf.printf
+          "The following command needs to be run through %S:\n    %s\n%!"
+          "doas" (String.concat " " cmd);
+        if interactive && not (ask ~default:true "Allow ?") then
+          exit 1;
+        "doas"::cmd
+      ) else cmd
+    | (`Linux | `Unix | `FreeBSD | `NetBSD | `Dragonfly), _
     | `Darwin, Some `Macports ->
       (* not sure about this list *)
       if Unix.getuid () <> 0 then (
