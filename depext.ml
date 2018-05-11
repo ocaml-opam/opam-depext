@@ -330,7 +330,7 @@ let install ~su ~interactive = function
 
 (* Command-line handling *)
 
-let main print_flags list short
+let main print_flags list short no_sources
     debug_arg install_arg update_arg dryrun_arg
     su_arg interactive_arg opam_args opam_packages =
   if debug_arg then debug := true;
@@ -403,6 +403,10 @@ let list_arg =
 let short_arg =
   Arg.(value & flag &
        info ~doc:"Only output the raw item lists" ["s";"short"])
+
+let no_sources_arg =
+  Arg.(value & flag &
+       info ~doc:"Included for backwards compatibility; ignored" ["no-sources"])
 
 let debug_arg =
   Arg.(value & flag &
@@ -489,7 +493,7 @@ let command =
   ] in
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
-        debug_arg $ install_arg $ update_arg $ dryrun_arg $
+        no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
         su_arg $ interactive_arg $ opam_args $
         packages_arg),
   Term.info "opam-depext" ~version:"1.1.1" ~doc ~man
