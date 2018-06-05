@@ -481,7 +481,7 @@ let command =
     `P "$(b,opam-depext) is written by Louis Gesbert \
         <louis.gesbert@ocamlpro.com>, copyright OCamlPro 2014-2015 with \
         contributions from Anil Madhavapeddy, distributed under the terms of \
-        the LGPL v3 with linking exception. Full source available at \
+        the LGPL v2.1 with linking exception. Full source available at \
         $(i,https://github.com/ocaml/opam-depext)";
     `S "BUGS";
     `P "Bugs are tracked at $(i,https://github.com/ocaml/opam-depext/issues) \
