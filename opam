@@ -1,14 +1,14 @@
 opam-version: "1.2"
-name: "depext"
+name: "opam-depext"
 maintainer: ["Louis Gesbert <louis.gesbert@ocamlpro.com>"
              "Anil Madhavapeddy <anil@recoil.org>" ]
 authors: ["Louis Gesbert <louis.gesbert@ocamlpro.com>"
           "Anil Madhavapeddy <anil@recoil.org>"]
 homepage: "https://github.com/ocaml/opam-depext"
 bug-reports: "https://github.com/ocaml/opam-depext/issues"
-license: "LGPL-3.0 with OCaml linking exception"
-dev-repo: "https://github.com/ocaml/opam-depext.git"
+license: "LGPL-2.1 with OCaml linking exception"
+dev-repo: "https://github.com/ocaml/opam-depext.git#2.0"
 build: [ make ]
 depends: [ ]
-available: [ opam-version >= "1.1.0" ]
+available: [ opam-version >= "2.0.0~beta5" ]
 tags: "flags:plugin"

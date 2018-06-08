@@ -11,12 +11,25 @@ let lines_of_channel ic =
   in
   List.rev (aux [])
 
+exception Fatal_error of string * int
+
+let fatal_error ?(exit_code=1) fmt =
+  Printf.ksprintf (fun s -> raise (Fatal_error (s, exit_code))) fmt
+
 let lines_of_command c =
   if !debug then Printf.eprintf "+ %s\n%!" c;
   let ic = Unix.open_process_in c in
   let lines = lines_of_channel ic in
-  ignore (Unix.close_process_in ic);
-  lines
+  match Unix.close_process_in ic with
+  | Unix.WEXITED 0 -> lines
+  | Unix.WEXITED 127 ->
+    fatal_error "Command not found: %s" c
+  | Unix.WEXITED i ->
+    fatal_error ~exit_code:i "Command failed: %s returned %d" c i
+  | Unix.WSIGNALED i ->
+    fatal_error "Command failed: %s signal %d" c i
+  | Unix.WSTOPPED i ->
+    fatal_error "Command failed: %s stopped %d" c i
 
 let lines_of_file f =
   let ic = open_in f in
@@ -24,15 +37,10 @@ let lines_of_file f =
   close_in ic;
   lines
 
-exception Fatal_error of string
-
-let fatal_error fmt =
-  Printf.ksprintf (fun s -> raise (Fatal_error s)) fmt
-
 let command_output c =
-  match lines_of_command c with
+  match List.filter (fun s -> String.trim s <> "") (lines_of_command c) with
   | [s] -> s
-  | _ -> fatal_error "Command %S failed" c
+  | _ -> fatal_error "Output of command too long: %S" c
 
 let string_split char str =
   let rec aux pos =
@@ -67,112 +75,28 @@ let ask ?(default=false) fmt =
 
 (* system detection *)
 
-let arch () =
-  match command_output "uname -m" with
-  | "x86_64" -> `X86_64
-  | "x86" | "i386" | "i586" | "i686" -> `X86
-  | "armv7l" -> `Arm7
-  | "PPC" | "PowerPC" -> `PPC
-  | s -> `Other s
+let has_prefix s pfx =
+  let pfxlen = String.length pfx in
+  pfxlen <= String.length s &&
+  try for i = 0 to pfxlen do
+      if pfx.[i] <> s.[i] then raise Exit
+    done;
+    true
+  with Exit -> false
 
-let os () = match Sys.os_type with
-  | "Unix" ->
-    (match command_output "uname -s" with
-     | "Darwin"    -> `Darwin
-     | "Linux"     -> `Linux
-     | "FreeBSD"   -> `FreeBSD
-     | "OpenBSD"   -> `OpenBSD
-     | "NetBSD"    -> `NetBSD
-     | "DragonFly" -> `DragonFly
-     | _           -> `Unix)
-  | "Win32"  -> `Win32
-  | "Cygwin" -> `Cygwin
-  | s        -> `Other s
+let opam_query var = command_output (Printf.sprintf "opam var %s --readonly" var)
 
-let distribution = function
-  | `Darwin ->
-    if has_command "brew" then Some `Homebrew
-    else if has_command "port" then Some `Macports
-    else None
-  | `Linux ->
-    (try
-       let name =
-         let os_release_files = ["/etc/os-release"; "/usr/lib/os-release"] in
-         if List.exists Sys.file_exists os_release_files then
-           let file = List.find Sys.file_exists os_release_files in
-           let cmd = Printf.sprintf ". %s && echo $ID" file in
-           match command_output cmd with
-           | "" -> raise (Failure ("Parsing " ^ file))
-           | id -> id
-         else if has_command "lsb_release" then
-           command_output "lsb_release -i -s"
-         else let release_file = List.find Sys.file_exists
-                                           ["/etc/redhat-release"; "/etc/centos-release";
-                                            "/etc/gentoo-release"; "/etc/issue"]
-              in (List.hd (string_split ' ' (List.hd (lines_of_file release_file))))
-       in
-       match String.lowercase name with
-       | "debian" | "raspbian" -> Some `Debian
-       | "ubuntu" -> Some `Ubuntu
-       | "centos" -> Some `Centos
-       | "fedora" -> Some `Fedora
-       | "mageia" -> Some `Mageia
-       | "gentoo" -> Some `Gentoo
-       | "alpine" -> Some `Alpine
-       | "arch" -> Some `Archlinux
-       | "rhel" -> Some `RHEL
-       | "opensuse" -> Some `OpenSUSE
-       | "ol" -> Some `OracleLinux
-       | s -> Some (`Other s)
-     with Not_found | Failure _ -> None)
-  | `OpenBSD -> Some `OpenBSD
-  | `FreeBSD -> Some `FreeBSD
-  | _ -> None
+let arch = opam_query "arch"
+let os = opam_query "os"
+let distribution = opam_query "os-distribution"
+let family = opam_query "os-family"
 
-(* generate OPAM depexts flags *)
-
-let archflags = function
-  | `X86_64 -> ["x86_64"]
-  | `X86 -> ["x86"]
-  | `Arm7 -> ["arm";"armv7"]
-  | `PPC -> ["ppc"]
-  | `Other s -> [String.lowercase s]
-
-let osflags = function
-  | `Darwin -> ["osx"]
-  | `Linux -> ["linux"]
-  | `Unix -> ["unix"]
-  | `FreeBSD -> ["bsd";"freebsd"]
-  | `OpenBSD -> ["bsd";"openbsd"]
-  | `NetBSD -> ["bsd";"netbsd"]
-  | `DragonFly -> ["bsd";"dragonfly"]
-  | `Win32 -> ["mswindows";"win32"]
-  | `Cygwin -> ["mswindows";"cygwin"]
-  | `Other s -> [String.lowercase s]
-
-let distrflags = function
-  | Some `Homebrew -> ["homebrew"]
-  | Some `Macports -> ["macports"]
-  | Some `Debian -> ["debian"]
-  | Some `Ubuntu -> ["ubuntu"]
-  | Some `Centos -> ["centos"]
-  | Some `Fedora -> ["fedora"]
-  | Some `RHEL -> ["rhel"]
-  | Some `OpenSUSE -> ["opensuse"]
-  | Some `OracleLinux -> ["oraclelinux"]
-  | Some `Mageia -> ["mageia"]
-  | Some `Alpine -> ["alpine"]
-  | Some `Archlinux -> ["archlinux"]
-  | Some `Gentoo -> ["gentoo"]
-  | Some `OpenBSD -> ["openbsd"]
-  | Some `FreeBSD -> ["freebsd"]
-  | Some (`Other s) -> [String.lowercase s]
-  | None -> []
-
-(* current OPAM intf doesn't allow to filter depexts that have a given flag
-   (only depexts having any subset of the given flags) so we'll need to diff
-   since the "source" flag indicates a different format... *)
-let sourceflags = ["source"]
+let opam_vars = [
+  "arch", arch;
+  "os", os;
+  "os-distribution", distribution;
+  "os-family", family;
+]
 
 (* processing *)
 
@@ -180,36 +104,39 @@ let opam_version = lazy (
   command_output "opam --version"
 )
 
-let depexts flags opam_packages =
+let depexts opam_packages =
+  let opam_version = Lazy.force opam_version in
+  let recent_enough_opam =
+    let newer_beta5 s = s = "" || s.[0] <> '~' || s >= "~beta5" in
+    Scanf.sscanf opam_version "%d.%d.%d%s"
+      (fun a b c s -> a = 2 && (b > 0 || c > 0 || newer_beta5 s) || a > 2)
+  in
+  if not recent_enough_opam then
+    fatal_error
+      "This version of opam-depext requires opam 2.0.0~beta5 or higher";
   let c =
-    if String.sub (Lazy.force opam_version) 0 4 = "1.1." then
-      (* backwards-compatible command *)
-      Printf.sprintf "opam install --external=%s %s"
-        (String.concat "," flags)
-        (String.concat "," opam_packages)
-    else
-    (* this is lighter, more general and doesn't require a lock. But only on
-       newer opams *)
-    Printf.sprintf "opam list --safe --recursive --external=%s --required-by=%s"
-      (String.concat "," flags)
-      (String.concat "," opam_packages)
+    Printf.sprintf "opam list --readonly --external %s"
+      (match opam_packages with
+       | [] -> ""
+       | ps -> " --resolve=" ^ String.concat "," ps)
   in
   let s = lines_of_command c in
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
   List.flatten (List.map (string_split ' ') lines)
 
-let install_packages_commands ~interactive distribution packages =
+let install_packages_commands ~interactive packages =
   let yes opt r =
     if not interactive then opt @ r else r
   in
-  match distribution with
-  | Some `Homebrew ->
+  match family with
+  | "homebrew" ->
     ["brew"::"install"::packages]
-  | Some `Macports ->
+  | "macports" ->
     ["port"::"install"::packages]
-  | Some (`Debian | `Ubuntu) ->
+  | "debian" ->
     ["apt-get"::"install"::yes ["-qq"; "-yy"] packages]
-  | Some (`Centos | `Fedora | `Mageia | `RHEL | `OracleLinux) ->
+  | "rhel" | "centos" | "fedora" | "mageia" | "oraclelinux" ->
+    (* todo: check if they all declare "rhel" as primary family *)
     (* When opem-packages specify the epel-release package, usually it
        means that other dependencies require the EPEL repository to be
        already setup when yum-install is called. Cf. #70, #76. *)
@@ -221,37 +148,34 @@ let install_packages_commands ~interactive distribution packages =
     install_epel @
     ["yum"::"install"::yes ["-y"] (List.filter ((<>) epel_release) packages);
      "rpm"::"-q"::"--whatprovides"::packages]
-  | Some `FreeBSD ->
-    ["pkg"::"install"::packages]
-  | Some (`OpenBSD | `NetBSD) ->
-    ["pkg_add"::packages]
-  | Some `Archlinux ->
+  | "bsd" ->
+    if distribution = "freebsd" then ["pkg"::"install"::packages]
+    else ["pkg_add"::packages]
+  | "archlinux" ->
     ["pacman"::"-S"::packages]
-  | Some `Gentoo ->
+  | "gentoo" ->
     ["emerge"::packages]
-  | Some `Alpine ->
+  | "alpine" ->
     ["apk"::"add"::packages]
-  | Some `OpenSUSE ->
+  | "suse" | "opensuse" ->
     ["zypper"::yes ["--non-interactive"] ("install"::packages)]
-  | Some (`Other d) ->
-    fatal_error "Sorry, don't know how to install packages on your %s  system" d
-  | None ->
-    fatal_error "Sorry, don't know how to install packages on your system"
+  | s ->
+    fatal_error "Sorry, don't know how to install packages on your %s system" s
 
-let update_command = function
-  | Some (`Debian | `Ubuntu) ->
+let update_command = match family with
+  | "debian" ->
      ["apt-get";"update"]
-  | Some `Homebrew ->
+  | "homebrew" ->
      ["brew"; "update"]
-  | Some (`Centos | `Fedora | `Mageia | `RHEL) ->
+  | "rhel" | "centos" | "fedora" | "mageia" | "oraclelinux" ->
      ["yum"; "-y"; "update"]
-  | Some `Archlinux ->
+  | "archlinux" ->
      ["pacman"; "-S"]
-  | Some `Gentoo ->
+  | "gentoo" ->
      ["emerge"; "-u"]
-  | Some `Alpine ->
+  | "alpine" ->
      ["apk"; "update"]
-  | Some `OpenSUSE ->
+  | "suse" | "opensuse" ->
      ["zypper"; "--non-interactive"; "update"]
   | _ -> ["echo"; "Skipping system update on this platform."]
 
@@ -260,17 +184,17 @@ exception Signaled_or_stopped of string list * Unix.process_status
 module StringMap = Map.Make(String)
 
 (* filter 'packages' to retain only the installed ones *)
-let get_installed_packages distribution (packages: string list): string list =
-  match distribution with
-  | Some `Homebrew ->
+let get_installed_packages (packages: string list): string list =
+  match family with
+  | "homebrew" ->
     let lines = try lines_of_command "brew list" with _ -> [] in
     let installed = List.flatten (List.map (string_split ' ') lines) in
     List.filter (fun p -> List.mem p packages) installed
-  | Some `OpenSUSE ->
+  | "suse" | "opensuse" ->
     let lines = try lines_of_command "zypper --quiet se -i -t package|grep '^i '|awk -F'|' '{print $2}'|xargs echo" with _ -> [] in
     let installed = List.flatten (List.map (string_split ' ') lines) in
     List.filter (fun p -> List.mem p packages) installed
-  | Some (`Debian | `Ubuntu) ->
+  | "debian" ->
     (* First query regular package *)
     let cmd =
       (* ${db:Status-Status} would give only the column we're interested in, but
@@ -323,12 +247,12 @@ let get_installed_packages distribution (packages: string list): string list =
          | [pkg;_;_;"installed"] -> (try StringMap.find pkg virtual_map @ acc with Not_found -> acc)
          | _ -> acc)
       installed lines
-  | Some (`Centos | `Fedora | `Mageia | `Archlinux| `Gentoo | `Alpine | `RHEL | `OracleLinux) ->
+  | "centos" | "fedora" | "mageia" | "archlinux" | "gentoo" | "alpine" | "rhel" | "oraclelinux" ->
     let query_command_prefix = match distribution with
-      | Some (`Centos | `Fedora | `Mageia | `RHEL | `OracleLinux) -> ["rpm"; "-qi"]
-      | Some `Archlinux -> ["pacman"; "-Q"]
-      | Some `Gentoo -> ["equery"; "list"]
-      | Some `Alpine -> ["apk"; "info"; "-e"]
+      | "centos" | "fedora" | "mageia" | "rhel" | "oraclelinux" -> ["rpm"; "-qi"]
+      | "arch" -> ["pacman"; "-Q"]
+      | "gentoo" -> ["equery"; "list"]
+      | "alpine" -> ["apk"; "info"; "-e"]
       | _ -> assert(false)
     in
     List.filter
@@ -339,21 +263,22 @@ let get_installed_packages distribution (packages: string list): string list =
          | Unix.WEXITED 1 -> false (* not installed *)
          | exit_status -> raise (Signaled_or_stopped (cmd, exit_status))
       ) packages
-  | Some `FreeBSD ->
-    let installed = try lines_of_command "pkg query %n" with _ -> [] in
-    List.filter (fun p -> List.mem p packages) installed
-  | Some (`OpenBSD) ->
-    let installed = try lines_of_command "pkg_info -mqP" with _ -> [] in
-    List.filter (fun p -> List.mem p packages) installed
-  (* todo *)
-  | Some `Macports -> []
-  | Some (`NetBSD) -> []
-  | Some (`Other _) | None -> []
+  | "bsd" ->
+    (match distribution with
+     | "freebsd" ->
+       let installed = try lines_of_command "pkg query %n" with _ -> [] in
+       List.filter (fun p -> List.mem p packages) installed
+     | "openbsd" ->
+       let installed = try lines_of_command "pkg_info -mqP" with _ -> [] in
+       List.filter (fun p -> List.mem p packages) installed
+     | _ -> [])
+  | "macports" -> []
+  | _ -> []
 
-let sudo_run_command ~su ~interactive os distribution cmd =
+let sudo_run_command ~su ~interactive cmd =
   let cmd =
     match os, distribution with
-    | `OpenBSD, _ ->
+    | "openbsd", _ ->
       if Unix.getuid () <> 0 then (
         Printf.printf
           "The following command needs to be run through %S:\n    %s\n%!"
@@ -362,8 +287,8 @@ let sudo_run_command ~su ~interactive os distribution cmd =
           exit 1;
         "doas"::cmd
       ) else cmd
-    | (`Linux | `Unix | `FreeBSD | `NetBSD | `Dragonfly), _
-    | `Darwin, Some `Macports ->
+    | ("linux" | "unix" | "freebsd" | "netbsd" | "dragonfly"), _
+    | "macos", "macports" ->
       (* not sure about this list *)
       if Unix.getuid () <> 0 then (
         Printf.printf
@@ -380,68 +305,46 @@ let sudo_run_command ~su ~interactive os distribution cmd =
   in
   run_command cmd
 
-let update ~su ~interactive os distribution =
-  let cmd = update_command distribution in
-  match sudo_run_command ~su ~interactive os distribution cmd with
+let update ~su ~interactive =
+  match sudo_run_command ~su ~interactive update_command with
   | Unix.WEXITED 0 ->
     Printf.eprintf "# OS package update successful\n%!"
   | _ -> fatal_error "OS package update failed"
 
-let install ~su ~interactive os distribution = function
+let install ~su ~interactive = function
   | [] -> ()
   | os_packages ->
     let cmds =
-      install_packages_commands ~interactive distribution os_packages
+      install_packages_commands ~interactive os_packages
     in
     let is_success r = (r = Unix.WEXITED 0) in
     let ok =
       List.fold_left (fun ok cmd ->
           ok &&
-          is_success (sudo_run_command ~su ~interactive os distribution cmd))
+          is_success (sudo_run_command ~su ~interactive cmd))
         true cmds
     in
     if ok then Printf.eprintf "# OS packages installation successful\n%!"
     else fatal_error "OS package installation failed"
 
-let run_source_scripts = function
-  | [] -> ()
-  | source_urls ->
-    let commands =
-      (* OPAM supports (and requires) either, by doing it too we ensure that we
-         don't need extra depexts *)
-      if has_command "curl" then
-        (* This still feels a bit frightening, said this way. *)
-        List.map (Printf.sprintf "curl -L \"%s\" | sh -ex -") source_urls
-      else
-        List.map (Printf.sprintf "wget -O - \"%s\" | sh -ex -") source_urls
-    in
-    List.iter (fun cmd ->
-        match run_command [cmd] with
-        | Unix.WEXITED 0 -> ()
-        | _ -> fatal_error "Command %S failed" cmd)
-      commands;
-    Printf.eprintf "Source installation scripts run successfully\n%!"
-
 
 (* Command-line handling *)
 
-let main print_flags list short no_sources
+let main print_flags list short
     debug_arg install_arg update_arg dryrun_arg
     su_arg interactive_arg opam_args opam_packages =
   if debug_arg then debug := true;
-  let arch = arch () in
-  let os = os () in
-  let distribution = distribution os in
-  let flags = archflags arch @ osflags os @ distrflags distribution in
   if print_flags then
-    (if short then List.iter print_endline flags else
-       Printf.eprintf "# Depexts flags detected on this system: %s\n"
-         (String.concat " " flags);
+    (if short then
+       List.iter (fun (v,x) -> Printf.eprintf "%s=%s\n" v x) opam_vars
+     else
+       Printf.eprintf "# Depexts vars detected on this system: %s\n%!"
+         (String.concat ", " (List.map (fun (v,x) -> v^"="^x) opam_vars));
      exit 0);
   if not short then
-    Printf.eprintf "# Detecting depexts using flags: %s\n%!"
-      (String.concat " " flags);
-  let os_packages = depexts flags opam_packages in
+    Printf.eprintf "# Detecting depexts using vars: %s\n%!"
+      (String.concat ", " (List.map (fun (v,x) -> v^"="^x) opam_vars));
+  let os_packages = depexts opam_packages in
   if os_packages <> [] && not short then
     begin
       prerr_endline "# The following system packages are needed:";
@@ -450,23 +353,13 @@ let main print_flags list short no_sources
   else if list && not short then
     prerr_endline "# No required system packages found";
   if list then exit 0;
-  let source_urls =
-    if no_sources then [] else
-      List.filter (fun s -> not (List.mem s os_packages))
-        (depexts (sourceflags @ flags) opam_packages)
-  in
-  if source_urls <> [] && not short then
-    Printf.eprintf "# The following scripts need to be run:\n#  - %s\n%!"
-      (String.concat "\n#  - " source_urls);
-  if os_packages = [] && source_urls = [] && not short then
+  if os_packages = [] && not short then
     Printf.eprintf "# No extra OS packages requirements found.\n%!";
-  let installed = get_installed_packages distribution os_packages in
+  let installed = get_installed_packages os_packages in
   let os_packages =
     List.filter (fun p -> not (List.mem p installed)) os_packages
   in
-  if short then
-    (List.iter print_endline os_packages;
-     List.iter print_endline source_urls)
+  if short then List.iter print_endline os_packages
   else if installed <> [] then
     if os_packages <> [] then
       Printf.eprintf
@@ -482,9 +375,8 @@ let main print_flags list short no_sources
     | None -> not (List.mem "--yes" opam_args) && Unix.isatty Unix.stdin
   in
   if (os_packages <> [] || opam_packages = []) && update_arg then
-    update ~su ~interactive os distribution;
-  install ~su ~interactive os distribution os_packages;
-  run_source_scripts source_urls;
+    update ~su ~interactive;
+  install ~su ~interactive os_packages;
   let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
   if install_arg && opam_packages <> [] then begin
     (if not short then Printf.eprintf "# Now letting OPAM install the packages\n%!");
@@ -502,7 +394,7 @@ let packages_arg =
 
 let print_flags_arg =
   Arg.(value & flag &
-       info ~doc:"Only display the inferred \"depexts\" flags" ["flags"])
+       info ~doc:"Only display the inferred \"depexts\" variables" ["flags"])
 
 let list_arg =
   Arg.(value & flag &
@@ -511,10 +403,6 @@ let list_arg =
 let short_arg =
   Arg.(value & flag &
        info ~doc:"Only output the raw item lists" ["s";"short"])
-
-let no_sources_arg =
-  Arg.(value & flag &
-       info ~doc:"Don't handle remote source scripts" ["no-sources"])
 
 let debug_arg =
   Arg.(value & flag &
@@ -548,10 +436,10 @@ let interactive_arg =
 
 let dryrun_arg =
   Arg.(value & flag &
-       info ~doc:"Only list the new system packages (and source scripts) that \
-                  would need to be installed, don't try to install them. Exits \
-                  with 0 if all required system packages are already installed, \
-                  1 otherwise."
+       info ~doc:"Only list the new system packages that would need to be \
+                  installed, don't try to install them. Exits with 0 if all \
+                  required system packages are already installed, 1 \
+                  otherwise."
          ["n";"dry-run"])
 
 let opam_args =
@@ -580,31 +468,31 @@ let opam_args =
 let command =
   let man = [
     `S "DESCRIPTION";
-    `P "$(b,opam-depext) is a simple program intended to facilitate the interaction \
-        between OPAM packages and the host package management system. It can \
-        perform OS and distribution detection, query OPAM for the right \
-        external dependencies on a set of packages, and call the OS package \
-        manager in the appropriate way to install then.";
+    `P "$(b,opam-depext) is a simple program intended to facilitate the \
+        interaction between OPAM packages and the host package management \
+        system. It can perform OS and distribution detection, query OPAM for \
+        the right external dependencies on a set of packages, and call the OS \
+        package manager in the appropriate way to install then.";
     `S "OPAM OPTIONS";
-    `P "These options are passed through to the child opam process when \
-        used in conjunction with the $(i,-i) flag. Additionally, $(i,--yes) \
-        implies $(i,--noninteractive) unless $(i,--interactive) was made \
-        explicit.";
+    `P "These options are passed through to the child opam process when used \
+        in conjunction with the $(i,-i) flag. Additionally, $(i,--yes) implies \
+        $(i,--noninteractive) unless $(i,--interactive) was made explicit.";
     `S "COPYRIGHT";
-    `P "$(b,opam-depext) is written by Louis Gesbert <louis.gesbert@ocamlpro.com>, \
-        copyright OCamlPro 2014-2015 with contributions from Anil Madhavapeddy, \
-        distributed under the terms of the LGPL v3 with linking exception. \
-        Full source available at $(i,https://github.com/ocaml/opam-depext)";
+    `P "$(b,opam-depext) is written by Louis Gesbert \
+        <louis.gesbert@ocamlpro.com>, copyright OCamlPro 2014-2015 with \
+        contributions from Anil Madhavapeddy, distributed under the terms of \
+        the LGPL v3 with linking exception. Full source available at \
+        $(i,https://github.com/ocaml/opam-depext)";
     `S "BUGS";
     `P "Bugs are tracked at $(i,https://github.com/ocaml/opam-depext/issues) \
         or can be reported to $(i,<opam-devel@lists.ocaml.org>).";
   ] in
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
-        no_sources_arg $ debug_arg $ install_arg $ update_arg $ dryrun_arg $
+        debug_arg $ install_arg $ update_arg $ dryrun_arg $
         su_arg $ interactive_arg $ opam_args $
         packages_arg),
-  Term.info "opam-depext" ~version:"1.0.6" ~doc ~man
+  Term.info "opam-depext" ~version:"1.1.2" ~doc ~man
 
 let () =
   Sys.catch_break true;
@@ -617,6 +505,6 @@ let () =
   | Sys.Break ->
     prerr_endline "Interrupted.";
     exit 130
-  | Fatal_error m ->
+  | Fatal_error (m, exit_code) ->
     prerr_endline m;
-    exit 1
+    exit exit_code
