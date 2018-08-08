@@ -253,7 +253,7 @@ let get_installed_packages (packages: string list): string list =
       | "archlinux" -> ["pacman"; "-Q"]
       | "gentoo" -> ["equery"; "list"]
       | "alpine" -> ["apk"; "info"; "-e"]
-      | _ -> assert(false)
+      | _ -> fatal_error "Distribution %s is not supported" distribution
     in
     List.filter
       (fun pkg_name ->
