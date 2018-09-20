@@ -372,7 +372,7 @@ let sudo_run_command ~su ~interactive os distribution cmd =
         if interactive && not (ask ~default:true "Allow ?") then
           exit 1;
         if su then
-          ["su"; "-c"; Printf.sprintf "%S" (String.concat " " cmd)]
+          ["su"; "root"; "-c"; Printf.sprintf "%S" (String.concat " " cmd)]
         else
           "sudo"::cmd
       ) else cmd
