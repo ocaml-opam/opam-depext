@@ -250,7 +250,7 @@ let get_installed_packages (packages: string list): string list =
   | "amzn" | "centos" | "fedora" | "mageia" | "archlinux" | "gentoo" | "alpine" | "rhel" | "oraclelinux" ->
     let query_command_prefix = match distribution with
       | "amzn" | "centos" | "fedora" | "mageia" | "rhel" | "oraclelinux" -> ["rpm"; "-qi"]
-      | "archlinux" -> ["pacman"; "-Q"]
+      | "archlinux" | "arch" -> ["pacman"; "-Q"]
       | "gentoo" -> ["equery"; "list"]
       | "alpine" -> ["apk"; "info"; "-e"]
       | _ -> fatal_error "Distribution %s is not supported" distribution
@@ -297,7 +297,7 @@ let sudo_run_command ~su ~interactive cmd =
         if interactive && not (ask ~default:true "Allow ?") then
           exit 1;
         if su then
-          ["su"; "-c"; Printf.sprintf "%S" (String.concat " " cmd)]
+          ["su"; "root"; "-c"; Printf.sprintf "%S" (String.concat " " cmd)]
         else
           "sudo"::cmd
       ) else cmd
