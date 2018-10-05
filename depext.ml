@@ -250,7 +250,7 @@ let get_installed_packages (packages: string list): string list =
   | "centos" | "fedora" | "mageia" | "archlinux" | "gentoo" | "alpine" | "rhel" | "oraclelinux" ->
     let query_command_prefix = match distribution with
       | "centos" | "fedora" | "mageia" | "rhel" | "oraclelinux" -> ["rpm"; "-qi"]
-      | "archlinux" -> ["pacman"; "-Q"]
+      | "archlinux" | "arch" -> ["pacman"; "-Q"]
       | "gentoo" -> ["equery"; "list"]
       | "alpine" -> ["apk"; "info"; "-e"]
       | _ -> assert(false)
