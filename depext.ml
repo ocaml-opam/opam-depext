@@ -247,13 +247,13 @@ let get_installed_packages (packages: string list): string list =
          | [pkg;_;_;"installed"] -> (try StringMap.find pkg virtual_map @ acc with Not_found -> acc)
          | _ -> acc)
       installed lines
-  | "centos" | "fedora" | "mageia" | "archlinux" | "gentoo" | "alpine" | "rhel" | "oraclelinux" ->
+  | "amzn" | "centos" | "fedora" | "mageia" | "archlinux" | "gentoo" | "alpine" | "rhel" | "oraclelinux" ->
     let query_command_prefix = match distribution with
-      | "centos" | "fedora" | "mageia" | "rhel" | "oraclelinux" -> ["rpm"; "-qi"]
+      | "amzn" | "centos" | "fedora" | "mageia" | "rhel" | "oraclelinux" -> ["rpm"; "-qi"]
       | "archlinux" | "arch" -> ["pacman"; "-Q"]
       | "gentoo" -> ["equery"; "list"]
       | "alpine" -> ["apk"; "info"; "-e"]
-      | _ -> assert(false)
+      | _ -> fatal_error "Distribution %s is not supported" distribution
     in
     List.filter
       (fun pkg_name ->
