@@ -121,7 +121,7 @@ let distribution = function
        | "alpine" -> Some `Alpine
        | "arch" -> Some `Archlinux
        | "rhel" -> Some `RHEL
-       | "opensuse" -> Some `OpenSUSE
+       | "opensuse" | "opensuse-leap" -> Some `OpenSUSE
        | "ol" -> Some `OracleLinux
        | s -> Some (`Other s)
      with Not_found | Failure _ -> None)
