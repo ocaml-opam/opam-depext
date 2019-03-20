@@ -1,3 +1,11 @@
+Frozen Repository
+=================
+
+**opam-depext is being integrated into opam. Please refer to this [opam
+issue](https://github.com/ocaml/opam/issues/3790) if you want to request
+changes.**
+
+
 OPAM depext plugin
 ==================
 
