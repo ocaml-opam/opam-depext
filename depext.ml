@@ -104,7 +104,7 @@ let opam_version = lazy (
   command_output "opam --version"
 )
 
-let depexts opam_packages =
+let depexts ~with_tests ~with_docs opam_packages =
   let opam_version = Lazy.force opam_version in
   let recent_enough_opam =
     let newer_beta5 s = s = "" || s.[0] <> '~' || s >= "~beta5" in
@@ -115,7 +115,9 @@ let depexts opam_packages =
     fatal_error
       "This version of opam-depext requires opam 2.0.0~beta5 or higher";
   let c =
-    Printf.sprintf "opam list --readonly --external %s"
+    Printf.sprintf "opam list --readonly %s%s--external %s"
+      (if with_tests then "--with-test " else "")
+      (if with_docs then "--with-doc " else "")
       (match opam_packages with
        | [] -> ""
        | ps -> " --resolve=" ^ String.concat "," ps)
@@ -330,9 +332,19 @@ let install ~su ~interactive = function
 
 (* Command-line handling *)
 
+let checkenv var opt =
+  let v = try Unix.getenv var with _ -> "" in
+  match v with
+  |"true"|"1"|"yes"|"y" -> true
+  |"false"|"0"|"no"|"n" -> false
+  |_ -> opt
+
 let main print_flags list short
     debug_arg install_arg update_arg dryrun_arg
+    with_tests_arg with_docs_arg
     su_arg interactive_arg opam_args opam_packages =
+  let with_tests_arg = checkenv "OPAMWITHTEST" with_tests_arg in
+  let with_docs_arg = checkenv "OPAMWITHDOC" with_docs_arg in
   if debug_arg then debug := true;
   if print_flags then
     (if short then
@@ -344,7 +356,7 @@ let main print_flags list short
   if not short then
     Printf.eprintf "# Detecting depexts using vars: %s\n%!"
       (String.concat ", " (List.map (fun (v,x) -> v^"="^x) opam_vars));
-  let os_packages = depexts opam_packages in
+  let os_packages = depexts ~with_tests:with_tests_arg ~with_docs:with_docs_arg opam_packages in
   if os_packages <> [] && not short then
     begin
       prerr_endline "# The following system packages are needed:";
@@ -380,6 +392,8 @@ let main print_flags list short
   let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
   if install_arg && opam_packages <> [] then begin
     (if not short then Printf.eprintf "# Now letting OPAM install the packages\n%!");
+    let opam_cmdline = opam_cmdline @ (if with_tests_arg then ["--with-test"] else [])
+      @ (if with_docs_arg then ["--with-doc"] else []) in
     (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
     Unix.execvp "opam" (Array.of_list opam_cmdline)
   end
@@ -434,6 +448,14 @@ let interactive_arg =
         ["noninteractive"];
     ])
 
+let with_tests_arg =
+  Arg.(value & flag &
+    info ~doc:"Install test dependencies" ["with-test";"t"])
+
+let with_docs_arg =
+  Arg.(value & flag &
+    info ~doc:"Install doc dependencies" ["with-doc"])
+
 let dryrun_arg =
   Arg.(value & flag &
        info ~doc:"Only list the new system packages that would need to be \
@@ -451,7 +473,7 @@ let opam_args =
          Term.(pure (List.map (fun _ -> "--"^List.hd fs))
                $ term))
       [ ["verbose";"v"], (Some (Arg.env_var "OPAMVERBOSE" ~doc:"Force a verbose session"));
-        ["yes";"y"], (Some (Arg.env_var "OPAMYES" ~doc:"Force a non-interactive session")) ]
+        ["yes";"y"], (Some (Arg.env_var "OPAMYES" ~doc:"Force a non-interactive session"))]
   in
   let options =
     List.map
@@ -490,6 +512,7 @@ let command =
   let doc = "Query and install external dependencies of OPAM packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         debug_arg $ install_arg $ update_arg $ dryrun_arg $
+        with_tests_arg $ with_docs_arg $
         su_arg $ interactive_arg $ opam_args $
         packages_arg),
   Term.info "opam-depext" ~version:"1.1.2" ~doc ~man
