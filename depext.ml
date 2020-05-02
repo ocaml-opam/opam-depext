@@ -152,7 +152,7 @@ let install_packages_commands ~interactive packages =
      "rpm"::"-q"::"--whatprovides"::packages]
   | "bsd" ->
     if distribution = "freebsd" then ["pkg"::"install"::yes ["-y"] packages]
-    else ["pkg_add"::yes ~no:["-I"] ["-i"] packages]
+    else ["pkg_add"::yes ~no:["-i"] ["-I"] packages]
   | "archlinux" ->
     ["pacman"::"-S"::yes ["--noconfirm"] packages]
   | "gentoo" ->
