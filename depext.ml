@@ -127,8 +127,8 @@ let depexts ~with_tests ~with_docs opam_packages =
   List.flatten (List.map (string_split ' ') lines)
 
 let install_packages_commands ~interactive packages =
-  let yes opt r =
-    if not interactive then opt @ r else r
+  let yes ?(no=[]) yes r =
+    if not interactive then yes @ r else no @ r
   in
   match family with
   | "homebrew" ->
@@ -151,14 +151,14 @@ let install_packages_commands ~interactive packages =
     ["yum"::"install"::yes ["-y"] (List.filter ((<>) epel_release) packages);
      "rpm"::"-q"::"--whatprovides"::packages]
   | "bsd" ->
-    if distribution = "freebsd" then ["pkg"::"install"::packages]
-    else ["pkg_add"::packages]
+    if distribution = "freebsd" then ["pkg"::"install"::yes ["-y"] packages]
+    else ["pkg_add"::yes ~no:["-I"] ["-i"] packages]
   | "archlinux" ->
-    ["pacman"::"-S"::packages]
+    ["pacman"::"-S"::yes ["--noconfirm"] packages]
   | "gentoo" ->
-    ["emerge"::packages]
+    ["emerge"::yes ~no:["-a"] [] packages]
   | "alpine" ->
-    ["apk"::"add"::packages]
+    ["apk"::"add"::yes ~no:["-i"] [] packages]
   | "suse" | "opensuse" ->
     ["zypper"::yes ["--non-interactive"] ("install"::packages)]
   | s ->
