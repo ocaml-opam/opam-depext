@@ -73,6 +73,12 @@ let ask ?(default=false) fmt =
       with End_of_file -> false)
     fmt
 
+(* version *)
+
+let opam_version = lazy (
+  command_output "opam --version"
+)
+
 (* system detection *)
 
 let has_prefix s pfx =
@@ -84,12 +90,16 @@ let has_prefix s pfx =
     true
   with Exit -> false
 
-let opam_query var = command_output (Printf.sprintf "opam var %s --readonly" var)
+let opam_query_global var =
+  let opt =
+    if Lazy.force opam_version = "2.1.0~alpha" then "--global" else ""
+  in
+  command_output (Printf.sprintf "opam var %s --readonly %s" var opt)
 
-let arch = opam_query "arch"
-let os = opam_query "os"
-let distribution = opam_query "os-distribution"
-let family = opam_query "os-family"
+let arch = opam_query_global "arch"
+let os = opam_query_global "os"
+let distribution = opam_query_global "os-distribution"
+let family = opam_query_global "os-family"
 
 let opam_vars = [
   "arch", arch;
@@ -99,10 +109,6 @@ let opam_vars = [
 ]
 
 (* processing *)
-
-let opam_version = lazy (
-  command_output "opam --version"
-)
 
 let depexts ~with_tests ~with_docs opam_packages =
   let opam_version = Lazy.force opam_version in
