@@ -110,10 +110,6 @@ let opam_vars = [
 
 (* processing *)
 
-let cannot_escape_single_quotes s =
-  if String.contains s '\'' then
-    failwith "Quotes are forbidden in this query."
-
 let depexts ~with_tests ~with_docs opam_packages =
   let opam_version = Lazy.force opam_version in
   let recent_enough_opam =
@@ -125,13 +121,12 @@ let depexts ~with_tests ~with_docs opam_packages =
     fatal_error
       "This version of opam-depext requires opam 2.0.0~beta5 or higher";
   let c =
-    List.iter cannot_escape_single_quotes opam_packages;
     Printf.sprintf "opam list --readonly %s%s--external %s"
       (if with_tests then "--with-test " else "")
       (if with_docs then "--with-doc " else "")
       (match opam_packages with
        | [] -> ""
-       | ps -> " '--resolve=" ^ String.concat "," ps ^ "'")
+       | ps -> " " ^ Filename.quote ("--resolve=" ^ String.concat "," ps))
   in
   let s = lines_of_command c in
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
