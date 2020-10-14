@@ -126,7 +126,7 @@ let depexts ~with_tests ~with_docs opam_packages =
       (if with_docs then "--with-doc " else "")
       (match opam_packages with
        | [] -> ""
-       | ps -> " --resolve=" ^ String.concat "," ps)
+       | ps -> " " ^ Filename.quote ("--resolve=" ^ String.concat "," ps))
   in
   let s = lines_of_command c in
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
