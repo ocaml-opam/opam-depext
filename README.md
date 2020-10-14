@@ -1,7 +1,16 @@
 **This repository is light-frozen (only critical updates). External dependencies handling is integrated in opam (since [2.1.0-alpha](https://github.com/ocaml/opam/releases/tag/2.1.0-alpha)).**
 
 Opam depext plugin
-==================
+=======
+Frozen Repository
+=================
+
+**opam-depext is being integrated into opam. Please refer to this [opam
+issue](https://github.com/ocaml/opam/issues/3790) if you want to request
+changes.**
+
+
+OPAM depext plugin
 
 Replacement for the currently used shell-scripts handling distribution-specific
 installation of OPAM packages' external dependencies (as per the `depexts` field
