@@ -143,7 +143,7 @@ let install_packages_commands ~interactive packages =
     ["port"::"install"::packages]
   | "debian" ->
     ["apt-get"::"install"::yes ["-qq"; "-yy"] packages]
-  | "rhel" | "centos" | "fedora" | "mageia" | "oraclelinux" ->
+  | "rhel" | "centos" | "fedora" | "mageia" | "oraclelinux" | "ol" ->
     (* todo: check if they all declare "rhel" as primary family *)
     (* When opem-packages specify the epel-release package, usually it
        means that other dependencies require the EPEL repository to be
@@ -159,7 +159,7 @@ let install_packages_commands ~interactive packages =
   | "bsd" ->
     if distribution = "freebsd" then ["pkg"::"install"::yes ["-y"] packages]
     else ["pkg_add"::yes ~no:["-i"] ["-I"] packages]
-  | "archlinux" ->
+  | "archlinux" | "arch" ->
     ["pacman"::"-S"::yes ["--noconfirm"] packages]
   | "gentoo" ->
     ["emerge"::yes ~no:["-a"] [] packages]
@@ -175,9 +175,9 @@ let update_command = match family with
      ["apt-get";"update"]
   | "homebrew" ->
      ["brew"; "update"]
-  | "rhel" | "centos" | "fedora" | "mageia" | "oraclelinux" ->
+  | "rhel" | "centos" | "fedora" | "mageia" | "oraclelinux" | "ol" ->
      ["yum"; "-y"; "update"]
-  | "archlinux" ->
+  | "archlinux" | "arch" ->
      ["pacman"; "-S"]
   | "gentoo" ->
      ["emerge"; "-u"]
@@ -255,9 +255,9 @@ let get_installed_packages (packages: string list): string list =
          | [pkg;_;_;"installed"] -> (try StringMap.find pkg virtual_map @ acc with Not_found -> acc)
          | _ -> acc)
       installed lines
-  | "amzn" | "centos" | "fedora" | "mageia" | "archlinux" | "gentoo" | "alpine" | "rhel" | "oraclelinux" ->
+  | "amzn" | "centos" | "fedora" | "mageia" | "archlinux" | "arch" | "gentoo" | "alpine" | "rhel" | "oraclelinux" | "ol" ->
     let query_command_prefix = match distribution with
-      | "amzn" | "centos" | "fedora" | "mageia" | "rhel" | "oraclelinux" -> ["rpm"; "-qi"]
+      | "amzn" | "centos" | "fedora" | "mageia" | "rhel" | "oraclelinux" | "ol" -> ["rpm"; "-qi"]
       | "archlinux" | "arch" -> ["pacman"; "-Q"]
       | "gentoo" -> ["equery"; "list"]
       | "alpine" -> ["apk"; "info"; "-e"]
