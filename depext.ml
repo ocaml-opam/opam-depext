@@ -158,7 +158,8 @@ let install_packages_commands ~interactive packages =
      "rpm"::"-q"::"--whatprovides"::packages]
   | "bsd" ->
     if distribution = "freebsd" then ["pkg"::"install"::yes ["-y"] packages]
-    else ["pkg_add"::yes ~no:["-i"] ["-I"] packages]
+    else if distribution = "openbsd" then ["pkg_add"::yes ~no:["-i"] ["-I"] packages]
+    else ["pkgin"::yes ["-y"] ("install"::packages)]
   | "archlinux" | "arch" ->
     ["pacman"::"-S"::yes ["--noconfirm"] packages]
   | "gentoo" ->
@@ -178,7 +179,7 @@ let update_command = match family with
   | "rhel" | "centos" | "fedora" | "mageia" | "oraclelinux" | "ol" ->
      ["yum"; "-y"; "update"]
   | "archlinux" | "arch" ->
-     ["pacman"; "-S"]
+     ["pacman"; "-Sy"]
   | "gentoo" ->
      ["emerge"; "-u"]
   | "alpine" ->
