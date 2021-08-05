@@ -161,7 +161,7 @@ let install_packages_commands ~interactive packages =
     else if distribution = "openbsd" then ["pkg_add"::yes ~no:["-i"] ["-I"] packages]
     else ["pkgin"::yes ["-y"] ("install"::packages)]
   | "archlinux" | "arch" ->
-    ["pacman"::"-S"::yes ["--noconfirm"] packages]
+    ["pacman"::"-Su"::yes ["--noconfirm"] packages]
   | "gentoo" ->
     ["emerge"::yes ~no:["-a"] [] packages]
   | "alpine" ->
