@@ -177,7 +177,7 @@ let update_command = match family with
   | "homebrew" ->
      ["brew"; "update"]
   | "rhel" | "centos" | "fedora" | "mageia" | "oraclelinux" | "ol" ->
-     ["yum"; "-y"; "update"]
+     ["yum"; "makecache"]
   | "archlinux" | "arch" ->
      ["pacman"; "-Sy"]
   | "gentoo" ->
