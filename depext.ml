@@ -398,7 +398,7 @@ let main print_flags list short
   install ~su ~interactive os_packages;
   let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
   if install_arg && opam_packages <> [] then begin
-    (if not short then Printf.eprintf "# Now letting OPAM install the packages\n%!");
+    (if not short then Printf.eprintf "# Now letting opam install the packages\n%!");
     let opam_cmdline = opam_cmdline @ (if with_tests_arg then ["--with-test"] else [])
       @ (if with_docs_arg then ["--with-doc"] else []) in
     (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
@@ -410,7 +410,7 @@ open Cmdliner
 let packages_arg =
   Arg.(value & pos_all string [] &
        info ~docv:"PACKAGES"
-         ~doc:"OPAM packages to install external dependencies for. \
+         ~doc:"opam packages to install external dependencies for. \
                All installed packages if omitted" [])
 
 let print_flags_arg =
@@ -498,8 +498,8 @@ let command =
   let man = [
     `S "DESCRIPTION";
     `P "$(b,opam-depext) is a simple program intended to facilitate the \
-        interaction between OPAM packages and the host package management \
-        system. It can perform OS and distribution detection, query OPAM for \
+        interaction between opam packages and the host package management \
+        system. It can perform OS and distribution detection, query opam for \
         the right external dependencies on a set of packages, and call the OS \
         package manager in the appropriate way to install then.";
     `S "OPAM OPTIONS";
@@ -516,7 +516,7 @@ let command =
     `P "Bugs are tracked at $(i,https://github.com/ocaml/opam-depext/issues) \
         or can be reported to $(i,<opam-devel@lists.ocaml.org>).";
   ] in
-  let doc = "Query and install external dependencies of OPAM packages" in
+  let doc = "Query and install external dependencies of opam packages" in
   Term.(pure main $ print_flags_arg $ list_arg $ short_arg $
         debug_arg $ install_arg $ update_arg $ dryrun_arg $
         with_tests_arg $ with_docs_arg $
