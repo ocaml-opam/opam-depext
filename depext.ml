@@ -90,9 +90,13 @@ let has_prefix s pfx =
     true
   with Exit -> false
 
+let is_opam_2_1 =
+  let is = lazy (String.sub (Lazy.force opam_version) 0 3 = "2.1") in
+  fun () -> Lazy.force is
+
 let opam_query_global var =
   let opt =
-    if Lazy.force opam_version = "2.1.0~alpha" then "--global" else ""
+    if is_opam_2_1 () then "--global" else ""
   in
   command_output (Printf.sprintf "opam var %s --readonly %s" var opt)
 
@@ -171,7 +175,8 @@ let install_packages_commands ~interactive packages =
   | s ->
     fatal_error "Sorry, don't know how to install packages on your %s system" s
 
-let update_command = match family with
+let update_command =
+  match family with
   | "debian" ->
      ["apt-get";"update"]
   | "homebrew" ->
@@ -363,7 +368,9 @@ let main print_flags list short
   if not short then
     Printf.eprintf "# Detecting depexts using vars: %s\n%!"
       (String.concat ", " (List.map (fun (v,x) -> v^"="^x) opam_vars));
-  let os_packages = depexts ~with_tests:with_tests_arg ~with_docs:with_docs_arg opam_packages in
+  let os_packages =
+    depexts ~with_tests:with_tests_arg ~with_docs:with_docs_arg opam_packages
+  in
   if os_packages <> [] && not short then
     begin
       prerr_endline "# The following system packages are needed:";
@@ -374,36 +381,67 @@ let main print_flags list short
   if list then exit 0;
   if os_packages = [] && not short then
     Printf.eprintf "# No extra OS packages requirements found.\n%!";
-  let installed = get_installed_packages os_packages in
-  let os_packages =
-    List.filter (fun p -> not (List.mem p installed)) os_packages
-  in
-  if short then List.iter print_endline os_packages
-  else if installed <> [] then
-    if os_packages <> [] then
-      Printf.eprintf
-        "# The following new OS packages need to be installed: %s\n%!"
-        (String.concat " " os_packages)
-    else
-      Printf.eprintf
-        "# All required OS packages found.\n%!";
-  if dryrun_arg then exit (if os_packages = [] then 0 else 1);
-  let su = su_arg || not (has_command "sudo") in
   let interactive = match interactive_arg with
     | Some i -> i
     | None -> not (List.mem "--yes" opam_args) && Unix.isatty Unix.stdin
   in
-  if (os_packages <> [] || opam_packages = []) && update_arg then
-    update ~su ~interactive;
-  install ~su ~interactive os_packages;
-  let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
-  if install_arg && opam_packages <> [] then begin
-    (if not short then Printf.eprintf "# Now letting opam install the packages\n%!");
-    let opam_cmdline = opam_cmdline @ (if with_tests_arg then ["--with-test"] else [])
-      @ (if with_docs_arg then ["--with-doc"] else []) in
-    (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
-    Unix.execvp "opam" (Array.of_list opam_cmdline)
-  end
+  if is_opam_2_1 () then
+    let opam_run_args =
+      (if interactive then [] else ["--confirm-level=unsafe-yes"])
+      @ (if dryrun_arg then ["--dry-run"] else [])
+    in
+    let opam_install_args =
+      opam_args
+      @ (if with_tests_arg then ["--with-test"] else [])
+      @ (if with_docs_arg then ["--with-doc"] else [])
+      @ opam_run_args
+    in
+    (let opam_packages =
+       opam_packages @ lines_of_command "opam reinstall --list-pending"
+     in
+     if opam_packages <> [] then
+       if update_arg then
+         (match run_command (["opam"; "update"; "--depexts"] @ opam_run_args) with
+          | Unix.WEXITED 0 ->
+            Printf.eprintf "# OS package update successful\n%!"
+          | _ -> fatal_error "OS package update failed");
+     let cmd =
+       let opam_install =
+         ["opam"; "install"] @ opam_packages @ opam_install_args
+       in
+       if install_arg then opam_install else opam_install @ ["--depext-only"]
+     in
+     if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " cmd);
+     Unix.execvp "opam" (Array.of_list cmd))
+  else
+    (let installed = get_installed_packages os_packages in
+     let os_packages =
+       List.filter (fun p -> not (List.mem p installed)) os_packages
+     in
+     if short then List.iter print_endline os_packages
+     else if installed <> [] then
+       if os_packages <> [] then
+         Printf.eprintf
+           "# The following new OS packages need to be installed: %s\n%!"
+           (String.concat " " os_packages)
+       else
+         Printf.eprintf
+           "# All required OS packages found.\n%!";
+     if dryrun_arg then exit (if os_packages = [] then 0 else 1);
+     let su = su_arg || not (has_command "sudo") in
+     if (os_packages <> [] || opam_packages = []) && update_arg then
+       update ~su ~interactive;
+     install ~su ~interactive os_packages;
+     let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
+     if install_arg && opam_packages <> [] then
+       ((if not short then
+           Printf.eprintf "# Now letting opam install the packages\n%!");
+        let opam_cmdline =
+          opam_cmdline @ (if with_tests_arg then ["--with-test"] else [])
+          @ (if with_docs_arg then ["--with-doc"] else [])
+        in
+        (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
+        Unix.execvp "opam" (Array.of_list opam_cmdline)))
 
 open Cmdliner
 
