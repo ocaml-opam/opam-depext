@@ -358,6 +358,11 @@ let main print_flags list short
   let with_tests_arg = checkenv "OPAMWITHTEST" with_tests_arg in
   let with_docs_arg = checkenv "OPAMWITHDOC" with_docs_arg in
   if debug_arg then debug := true;
+  if is_opam_2_1 () then
+    Printf.eprintf
+      "You are using opam 2.1, where external dependency handling has been \
+       integrated: consider calling opam directly, the 'depext' plugin \
+       interface is provided for backwards compatibility only\n";
   if print_flags then
     (if short then
        List.iter (fun (v,x) -> Printf.eprintf "%s=%s\n" v x) opam_vars
