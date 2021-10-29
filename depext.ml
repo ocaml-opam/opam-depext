@@ -566,8 +566,9 @@ let command =
         $(i,--noninteractive) unless $(i,--interactive) was made explicit.";
     `S "COPYRIGHT";
     `P "$(b,opam-depext) is written by Louis Gesbert \
-        <louis.gesbert@ocamlpro.com>, copyright OCamlPro 2014-2015 with \
-        contributions from Anil Madhavapeddy, distributed under the terms of \
+        <louis.gesbert@ocamlpro.com>, copyright OCamlPro 2014-2021 with \
+        contributions from David Allsopp, Raja Boujbel, Kate Deplaix, \
+        Anil Madhavapeddy, distributed under the terms of \
         the LGPL v2.1 with linking exception. Full source available at \
         $(i,https://github.com/ocaml/opam-depext)";
     `S "BUGS";
