@@ -94,9 +94,11 @@ let is_opam_2_1 =
   let is = lazy (String.sub (Lazy.force opam_version) 0 3 = "2.1") in
   fun () -> Lazy.force is
 
+let cliv_2_1 = "--cli=2.1"
+
 let opam_query_global var =
   let opt =
-    if is_opam_2_1 () then "--global" else ""
+    if is_opam_2_1 () then cliv_2_1 ^" --global" else ""
   in
   command_output (Printf.sprintf "opam var %s --readonly %s" var opt)
 
@@ -125,12 +127,13 @@ let depexts ~with_tests ~with_docs opam_packages =
     fatal_error
       "This version of opam-depext requires opam 2.0.0~beta5 or higher";
   let c =
-    Printf.sprintf "opam list --readonly %s%s--external %s"
+    Printf.sprintf "opam list --readonly %s%s--external %s%s"
       (if with_tests then "--with-test " else "")
       (if with_docs then "--with-doc " else "")
       (match opam_packages with
        | [] -> ""
        | ps -> " " ^ Filename.quote ("--resolve=" ^ String.concat "," ps))
+      (if is_opam_2_1 () then " "^cliv_2_1 else "")
   in
   let s = lines_of_command c in
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
@@ -402,17 +405,29 @@ let main print_flags list short
       @ opam_run_args
     in
     (let opam_packages =
-       opam_packages @ lines_of_command "opam reinstall --list-pending"
+       let toreinstall =
+         let pending =
+           lines_of_command ("opam reinstall --list-pending " ^ cliv_2_1)
+           |> List.filter_map (fun nv ->
+               match string_split '.' nv with
+               | n::_ -> Some n
+               | _ -> None)
+         in
+         let pin = lines_of_command ("opam pin list --short " ^ cliv_2_1) in
+         List.filter (fun p -> not (List.mem p pin)) pending
+       in
+       opam_packages @ toreinstall
      in
      if opam_packages <> [] then
        if update_arg then
-         (match run_command (["opam"; "update"; "--depexts"] @ opam_run_args) with
-          | Unix.WEXITED 0 ->
-            Printf.eprintf "# OS package update successful\n%!"
-          | _ -> fatal_error "OS package update failed");
+         (match run_command (["opam"; "update"; "--depexts"]
+                             @ opam_run_args @ [ cliv_2_1 ]) with
+         | Unix.WEXITED 0 ->
+           Printf.eprintf "# OS package update successful\n%!"
+         | _ -> fatal_error "OS package update failed");
      let cmd =
        let opam_install =
-         ["opam"; "install"] @ opam_packages @ opam_install_args
+         ["opam"; "install"] @ opam_packages @ opam_install_args @ [ cliv_2_1 ]
        in
        if install_arg then opam_install else opam_install @ ["--depext-only"]
      in
