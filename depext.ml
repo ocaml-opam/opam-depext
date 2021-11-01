@@ -2,6 +2,10 @@
 
 let debug = ref false
 
+let cli_2_0 =
+  try Sys.getenv "OPAMCLI" = "2.0"
+  with Not_found -> false
+
 let lines_of_channel ic =
   let rec aux acc =
     let line = try Some (input_line ic) with End_of_file -> None in
@@ -90,17 +94,41 @@ let has_prefix s pfx =
     true
   with Exit -> false
 
-let is_opam_2_1 =
-  let is = lazy (String.sub (Lazy.force opam_version) 0 3 = "2.1") in
+let is_opam_2_0 =
+  let is = lazy (let v = Lazy.force opam_version in
+                 String.length v >= 4 && String.sub (Lazy.force opam_version) 0 4 = "2.0.") in
   fun () -> Lazy.force is
 
-let cliv_2_1 = "--cli=2.1"
+let run_opam f fmt =
+  let execute command =
+    let opam =
+      if is_opam_2_0 () then
+        "opam "
+      else
+        "opam --cli=2.1 "
+    in
+      f (opam ^ command)
+  in
+    Printf.ksprintf execute fmt
+
+let lines_of_opam fmt = run_opam lines_of_command fmt
+
+let opam_output fmt = run_opam command_output fmt
+
+let run_opam ?(via=run_command ?no_stderr:None) args =
+  let args =
+    if is_opam_2_0 () then
+      "opam" :: args
+    else
+      "opam" :: "--cli=2.1" :: args
+  in
+  via args
 
 let opam_query_global var =
   let opt =
-    if is_opam_2_1 () then cliv_2_1 ^" --global" else ""
+    if is_opam_2_0 () then "" else " --global "
   in
-  command_output (Printf.sprintf "opam var %s --readonly %s" var opt)
+  opam_output "var %s --readonly %s" var opt
 
 let arch = opam_query_global "arch"
 let os = opam_query_global "os"
@@ -126,16 +154,13 @@ let depexts ~with_tests ~with_docs opam_packages =
   if not recent_enough_opam then
     fatal_error
       "This version of opam-depext requires opam 2.0.0~beta5 or higher";
-  let c =
-    Printf.sprintf "opam list --readonly %s%s--external %s%s"
-      (if with_tests then "--with-test " else "")
-      (if with_docs then "--with-doc " else "")
-      (match opam_packages with
-       | [] -> ""
-       | ps -> " " ^ Filename.quote ("--resolve=" ^ String.concat "," ps))
-      (if is_opam_2_1 () then " "^cliv_2_1 else "")
+  let s = lines_of_opam "list --readonly %s%s--external%s"
+    (if with_tests then "--with-test " else "")
+    (if with_docs then "--with-doc " else "")
+    (match opam_packages with
+     | [] -> ""
+     | ps -> " " ^ Filename.quote ("--resolve=" ^ String.concat "," ps))
   in
-  let s = lines_of_command c in
   let lines = List.filter (fun s -> String.length s > 0 && s.[0] <> '#') s in
   List.flatten (List.map (string_split ' ') lines)
 
@@ -354,6 +379,13 @@ let checkenv var opt =
   |"false"|"0"|"no"|"n" -> false
   |_ -> opt
 
+let exec_opam =
+  let via args =
+    if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " args);
+    Unix.execvp "opam" (Array.of_list args)
+  in
+  run_opam ~via
+
 let main print_flags list short
     debug_arg install_arg update_arg dryrun_arg
     with_tests_arg with_docs_arg
@@ -361,9 +393,9 @@ let main print_flags list short
   let with_tests_arg = checkenv "OPAMWITHTEST" with_tests_arg in
   let with_docs_arg = checkenv "OPAMWITHDOC" with_docs_arg in
   if debug_arg then debug := true;
-  if is_opam_2_1 () then
+  if not (is_opam_2_0 () || cli_2_0)  then
     Printf.eprintf
-      "You are using opam 2.1, where external dependency handling has been \
+      "You are using opam 2.1+, where external dependency handling has been \
        integrated: consider calling opam directly, the 'depext' plugin \
        interface is provided for backwards compatibility only\n";
   if print_flags then
@@ -393,7 +425,7 @@ let main print_flags list short
     | Some i -> i
     | None -> not (List.mem "--yes" opam_args) && Unix.isatty Unix.stdin
   in
-  if is_opam_2_1 () then
+  if not (is_opam_2_0 ()) then
     let opam_run_args =
       (if interactive then [] else ["--confirm-level=unsafe-yes"])
       @ (if dryrun_arg then ["--dry-run"] else [])
@@ -407,32 +439,30 @@ let main print_flags list short
     (let opam_packages =
        let toreinstall =
          let pending =
-           lines_of_command ("opam reinstall --list-pending " ^ cliv_2_1)
+           lines_of_opam "reinstall --list-pending"
            |> List.filter_map (fun nv ->
                match string_split '.' nv with
                | n::_ -> Some n
                | _ -> None)
          in
-         let pin = lines_of_command ("opam pin list --short " ^ cliv_2_1) in
+         let pin = lines_of_opam ("pin list --short") in
          List.filter (fun p -> not (List.mem p pin)) pending
        in
        opam_packages @ toreinstall
      in
      if opam_packages <> [] then
        if update_arg then
-         (match run_command (["opam"; "update"; "--depexts"]
-                             @ opam_run_args @ [ cliv_2_1 ]) with
+         (match run_opam ("update" :: "--depexts" :: opam_run_args) with
          | Unix.WEXITED 0 ->
            Printf.eprintf "# OS package update successful\n%!"
          | _ -> fatal_error "OS package update failed");
-     let cmd =
+     let opam_cmdline =
        let opam_install =
-         ["opam"; "install"] @ opam_packages @ opam_install_args @ [ cliv_2_1 ]
+         "install" :: opam_packages @ opam_install_args
        in
        if install_arg then opam_install else opam_install @ ["--depext-only"]
      in
-     if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " cmd);
-     Unix.execvp "opam" (Array.of_list cmd))
+     ignore (exec_opam opam_cmdline))
   else
     (let installed = get_installed_packages os_packages in
      let os_packages =
@@ -452,7 +482,7 @@ let main print_flags list short
      if (os_packages <> [] || opam_packages = []) && update_arg then
        update ~su ~interactive;
      install ~su ~interactive os_packages;
-     let opam_cmdline = "opam"::"install":: opam_args @ opam_packages in
+     let opam_cmdline = "install":: opam_args @ opam_packages in
      if install_arg && opam_packages <> [] then
        ((if not short then
            Printf.eprintf "# Now letting opam install the packages\n%!");
@@ -460,8 +490,7 @@ let main print_flags list short
           opam_cmdline @ (if with_tests_arg then ["--with-test"] else [])
           @ (if with_docs_arg then ["--with-doc"] else [])
         in
-        (if !debug then Printf.eprintf "+ %s\n%!" (String.concat " " opam_cmdline));
-        Unix.execvp "opam" (Array.of_list opam_cmdline)))
+        ignore (exec_opam opam_cmdline)))
 
 open Cmdliner
 
@@ -585,6 +614,7 @@ let command =
 
 let () =
   Sys.catch_break true;
+  Unix.putenv "OPAMCLI" "2.0";
   try
     match Term.eval ~catch:false command with
     | `Ok () | `Version | `Help -> exit 0
