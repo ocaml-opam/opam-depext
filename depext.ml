@@ -451,18 +451,18 @@ let main print_flags list short
        opam_packages @ toreinstall
      in
      if opam_packages <> [] then
-       if update_arg then
-         (match run_opam ("update" :: "--depexts" :: opam_run_args) with
-         | Unix.WEXITED 0 ->
-           Printf.eprintf "# OS package update successful\n%!"
-         | _ -> fatal_error "OS package update failed");
-     let opam_cmdline =
-       let opam_install =
-         "install" :: opam_packages @ opam_install_args
-       in
-       if install_arg then opam_install else opam_install @ ["--depext-only"]
-     in
-     ignore (exec_opam opam_cmdline))
+       (if update_arg then
+          (match run_opam ("update" :: "--depexts" :: opam_run_args) with
+           | Unix.WEXITED 0 ->
+             Printf.eprintf "# OS package update successful\n%!"
+           | _ -> fatal_error "OS package update failed");
+        let opam_cmdline =
+          let opam_install =
+            "install" :: opam_packages @ opam_install_args
+          in
+          if install_arg then opam_install else opam_install @ ["--depext-only"]
+        in
+        ignore (exec_opam opam_cmdline)))
   else
     (let installed = get_installed_packages os_packages in
      let os_packages =
