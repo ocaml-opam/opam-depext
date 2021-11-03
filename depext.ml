@@ -126,9 +126,9 @@ let run_opam ?(via=run_command ?no_stderr:None) args =
 
 let opam_query_global var =
   let opt =
-    if is_opam_2_0 () then "" else " --global "
+    if is_opam_2_0 () then "" else " --global"
   in
-  opam_output "var %s --readonly %s" var opt
+  opam_output "var %s --readonly%s" var opt
 
 let arch = opam_query_global "arch"
 let os = opam_query_global "os"
