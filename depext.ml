@@ -448,11 +448,10 @@ let main print_flags list short
     (let opam_packages =
        let toreinstall =
          let pending =
-           lines_of_opam "reinstall --list-pending"
-           |> filter_map (fun nv ->
-               match string_split '.' nv with
-               | n::_ -> Some n
-               | _ -> None)
+           filter_map (fun nv ->
+             match string_split '.' nv with
+             | n::_ -> Some n
+             | _ -> None) (lines_of_opam "reinstall --list-pending")
          in
          let pin = lines_of_opam ("pin list --short") in
          List.filter (fun p -> not (List.mem p pin)) pending
