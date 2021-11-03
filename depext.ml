@@ -57,6 +57,15 @@ let string_split char str =
   in
   aux 0
 
+let filter_map f =
+  let rec loop acc = function
+  | [] -> List.rev acc
+  | x :: l ->
+      match f x with
+      | None -> loop acc l
+      | Some x -> loop (x::acc) l
+  in loop []
+
 let has_command c =
   let cmd = Printf.sprintf "command -v %s >/dev/null" c in
   try Sys.command cmd = 0 with Sys_error _ -> false
@@ -440,7 +449,7 @@ let main print_flags list short
        let toreinstall =
          let pending =
            lines_of_opam "reinstall --list-pending"
-           |> List.filter_map (fun nv ->
+           |> filter_map (fun nv ->
                match string_split '.' nv with
                | n::_ -> Some n
                | _ -> None)
