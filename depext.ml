@@ -468,7 +468,12 @@ let main print_flags list short
           let opam_install =
             "install" :: opam_packages @ opam_install_args
           in
-          if install_arg then opam_install else opam_install @ ["--depext-only"]
+          if install_arg then opam_install else
+          if interactive &&
+             not (ask ~default:true "Allow installing depexts via opam ?") then
+            exit 1
+          else
+            opam_install @ ["--depext-only"]
         in
         ignore (exec_opam opam_cmdline)))
   else
