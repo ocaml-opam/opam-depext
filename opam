@@ -37,5 +37,5 @@ right external dependencies on a set of packages, depending on the host OS, and
 call the OS's package manager in the appropriate way to install them.
 """
 post-messages: [
-  "opam-depext is deprecated when used with opam >= 2.1. Please use opam install directly instead" {opam-version >= "2.1"}
+  "opam-depext is unnecessary when used with opam >= 2.1. Please use opam install directly instead" {opam-version >= "2.1"}
 ]
