@@ -21,12 +21,12 @@ depends: [
 available: opam-version >= "2.0.0~beta5"
 flags: plugin
 build: [
-  [make] {!pinned}
+  [make] {!dev}
   ["ocamlfind" "%{ocaml:native?ocamlopt:ocamlc}%"
    "-package" "unix,cmdliner" "-linkpkg"
     "-o" "opam-depext"
     "depext.ml"
-  ] {pinned}
+  ] {dev}
 ]
 dev-repo: "git+https://github.com/ocaml/opam-depext.git#2.0"
 synopsis: "Install OS distribution packages"
@@ -36,3 +36,6 @@ OPAM packages and the host package management system. It can query OPAM for the
 right external dependencies on a set of packages, depending on the host OS, and
 call the OS's package manager in the appropriate way to install them.
 """
+post-messages: [
+  "opam-depext is unnecessary when used with opam >= 2.1. Please use opam install directly instead" {opam-version >= "2.1"}
+]
