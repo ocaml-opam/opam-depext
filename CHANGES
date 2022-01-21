@@ -1,3 +1,24 @@
+1.2.1 (2022-01-21):
+* Add OCaml 5.00 compatibility (#147 by @dra27)
+
+1.2.0 (2021-11-10):
+* Support opam 2.1 to allow workflows using OPAMCLI=2.0 (#142 by @rjbou)
+* Always upgrade installed packages when adding new packages on Arch
+  (#138 by @kit-ty-kate)
+* Prevent yum-based distributions from upgrading during an update
+  (#137 by @kit-ty-kate)
+
+1.1.5 (2021-11-10):
+* Fix `depext -u` on Arch Linux and add more BSD support (#135 by @kit-ty-kate)
+* Fix Arch Linux and Oracle Linux support (#134 by @kit-ty-kate)
+
+1.1.4 (2020-10-14):
+* Fix shell quoting when calling opam (#132 by @kit-ty-kate)
+* Display the correct licence in the man page (#98 by @avsm)
+* Make behaviour of interactive yes consistent across platforms, mirroring
+  the integrated depext support in ocaml/opam#4168 (#123 by @kit-ty-kate)
+* Compatibility with opam 2.1.0~alpha (#126 by @rjbou)
+
 1.1.3 (2019-04-24):
 * Support test-only and docs-only dependencies in opam files via
   `--with-test` and `--with-doc` to opam-depext.
