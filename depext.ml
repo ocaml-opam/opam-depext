@@ -79,9 +79,9 @@ let run_command ?(no_stderr=false) c =
 let ask ?(default=false) fmt =
   Printf.ksprintf (fun s ->
       Printf.printf "%s [%s] %!" s (if default then "Y/n" else "y/N");
-      try match String.lowercase (read_line ()) with
-        | "y" | "yes" -> true
-        | "n" | "no" -> false
+      try match read_line () with
+        | "y" | "Y" | "yes" | "Yes" | "yEs" | "yeS" | "YEs" | "yES" | "YeS" | "YES" -> true
+        | "n" | "N" | "no" | "nO" | "No" | "NO" -> false
         | _  -> default
       with End_of_file -> false)
     fmt

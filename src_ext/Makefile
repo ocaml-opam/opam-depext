@@ -24,7 +24,17 @@ build: clone
 all: bcl ncl
 
 clone: $(SRC_EXTS:=.stamp)
+ifneq ($(filter 4.%,$(shell $(OCAMLC) -vnum)),)
 	@
+else
+	@mv cmdliner/src/cmdliner.ml cmdliner/src/t
+	@echo 'module String = struct include String' > cmdliner/src/cmdliner.ml
+	@echo '  let uppercase = uppercase_ascii' >> cmdliner/src/cmdliner.ml
+	@echo '  let lowercase = lowercase_ascii' >> cmdliner/src/cmdliner.ml
+	@echo '  let capitalize = capitalize_ascii' >> cmdliner/src/cmdliner.ml
+	@echo 'end' >> cmdliner/src/cmdliner.ml
+	@cat cmdliner/src/t >> cmdliner/src/cmdliner.ml
+endif
 
 archives: $(SRC_EXTS:=.download)
 	@
