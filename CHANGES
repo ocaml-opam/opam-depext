@@ -1,3 +1,6 @@
+Next:
+* Add OCaml 5.00 compatibility (#147 by @dra27)
+
 1.2.0 (2021-11-10):
 * Support opam 2.1 to allow workflows using OPAMCLI=2.0 (#142 by @rjbou)
 * Always upgrade installed packages when adding new packages on Arch
