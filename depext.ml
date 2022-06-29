@@ -112,9 +112,9 @@ let run_opam f fmt =
   let execute command =
     let opam =
       if is_opam_2_0 () then
-        "opam "
+        "opam --color=never "
       else
-        "opam --cli=2.1 "
+        "opam --color=never --cli=2.1 "
     in
       f (opam ^ command)
   in
