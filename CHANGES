@@ -1,3 +1,6 @@
+1.2.2 (2022-06-??):
+* Fix build on bytecode-only systems (#149 by @dra27)
+
 1.2.1 (2022-01-21):
 * Add OCaml 5.00 compatibility (#147 by @dra27)
 
