@@ -404,9 +404,11 @@ let main print_flags list short
   if debug_arg then debug := true;
   if not (is_opam_2_0 () || cli_2_0)  then
     Printf.eprintf
-      "You are using opam 2.1+, where external dependency handling has been \
-       integrated: consider calling opam directly, the 'depext' plugin \
-       interface is provided for backwards compatibility only\n";
+      "Since version 2.1, opam now handles external dependencies alongside ocaml ones, \
+      and the `depext` plugin interface is provided for backwards compatibility only. \
+      Consider using your usual `opam install` command to install both ocaml and \
+      system dependencies, or `opam install <pkg> --depext-only` if you want to only \
+      install external dependencies.\n";
   if print_flags then
     (if short then
        List.iter (fun (v,x) -> Printf.eprintf "%s=%s\n" v x) opam_vars
