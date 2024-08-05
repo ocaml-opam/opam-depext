@@ -1,5 +1,7 @@
-1.2.2 (2022-06-??):
+1.2.2 (2024-08-05):
 * Fix build on bytecode-only systems (#149 by @dra27)
+* Fix opam-depext in the presence of OPAMCOLOR=always (#150 by @kit-ty-kate)
+* Improve the warning message displayed with opam >= 2.1 (#152 by @krtab)
 
 1.2.1 (2022-01-21):
 * Add OCaml 5.00 compatibility (#147 by @dra27)
