@@ -1,3 +1,7 @@
+1.2.3 (2024-08-15):
+* Fix compilation in non-dev mode, broke by #149 (#153 by @kit-ty-kate)
+* Fix constant runtime error, broke by #150 (#153 by @kit-ty-kate)
+
 1.2.2 (2024-08-05):
 * Fix build on bytecode-only systems (#149 by @dra27)
 * Fix opam-depext in the presence of OPAMCOLOR=always (#150 by @kit-ty-kate)

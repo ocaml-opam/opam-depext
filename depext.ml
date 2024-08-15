@@ -112,11 +112,11 @@ let run_opam f fmt =
   let execute command =
     let opam =
       if is_opam_2_0 () then
-        "opam --color=never "
+        "opam "
       else
-        "opam --color=never --cli=2.1 "
+        "opam --cli=2.1 "
     in
-      f (opam ^ command)
+      f (opam ^ command ^ " --color=never")
   in
     Printf.ksprintf execute fmt
 
@@ -625,7 +625,7 @@ let command =
         with_tests_arg $ with_docs_arg $
         su_arg $ interactive_arg $ opam_args $
         packages_arg),
-  Term.info "opam-depext" ~version:"1.2.2" ~doc ~man
+  Term.info "opam-depext" ~version:"1.2.3" ~doc ~man
 
 let () =
   Sys.catch_break true;
