@@ -1,5 +1,5 @@
 all: shell/build.sh
-	cd src_ext && $(MAKE) OCAMLOPT=no bcl
+	cd src_ext && $(MAKE) OCAMLOPT=no
 	sh -ex shell/build.sh
 
 shell/build.sh: shell/build.ml
